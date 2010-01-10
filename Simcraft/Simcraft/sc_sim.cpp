@@ -746,9 +746,9 @@ bool sim_t::init()
 
   target -> init();
 
-  if ( ! player_t::init( this ) ) return false;
-
   raid_event_t::init( this );
+
+  if ( ! player_t::init( this ) ) return false;
 
   if ( report_precision < 0 ) report_precision = 3;
 
@@ -1219,6 +1219,7 @@ void sim_t::use_optimal_buffs_and_debuffs( int value )
   overrides.fortitude              = optimal_raid;
   overrides.frost_fever            = optimal_raid;
   overrides.heart_of_the_crusader  = optimal_raid;
+  overrides.heroic_presence        = optimal_raid;
   overrides.horn_of_winter         = optimal_raid;
   overrides.hunters_mark           = optimal_raid;
   overrides.improved_faerie_fire   = optimal_raid;
@@ -1365,7 +1366,16 @@ action_expr_t* sim_t::create_expression( action_t* a,
   {
     if ( splits[ 0 ] == "target" )
     {
-      if ( splits[ 1 ] == "health_pct" )
+      if ( splits[ 1 ] == "time_to_die" )
+      {
+	struct target_time_to_die_expr_t : public action_expr_t
+        {
+	  target_time_to_die_expr_t( action_t* a ) : action_expr_t( a, "target_time_to_die", TOK_NUM ) {}
+	  virtual int evaluate() { result_num = action -> sim -> target -> time_to_die();  return TOK_NUM; }
+	};
+	return new target_time_to_die_expr_t( a );
+      }
+      else if ( splits[ 1 ] == "health_pct" )
       {
 	struct target_health_pct_expr_t : public action_expr_t
         {
@@ -1382,6 +1392,22 @@ action_expr_t* sim_t::create_expression( action_t* a,
 	  virtual int evaluate() { result_num = action -> sim -> target -> adds_nearby;  return TOK_NUM; }
 	};
 	return new target_adds_expr_t( a );
+      }
+      else if ( splits[ 1 ] == "adds_never" )
+      {
+	struct target_adds_never_expr_t : public action_expr_t
+        {
+	  target_adds_never_expr_t( action_t* a ) : action_expr_t( a, "target_adds_never", TOK_NUM ) 
+	  {
+	    bool adds = a -> sim -> target -> initial_adds_nearby > 0;
+	    int num_events = ( int ) a -> sim -> raid_events.size();
+	    for ( int i=0; i < num_events; i++ )
+	      if ( a -> sim -> raid_events[ i ] -> name_str == "adds" ) 
+		adds = true;
+	    result_num = adds ? 0.0 : 1.0;
+	  }
+	};
+	return new target_adds_never_expr_t( a );
       }
     }
   }

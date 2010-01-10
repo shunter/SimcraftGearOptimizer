@@ -1792,7 +1792,14 @@ void player_t::combat_begin()
     schedule_ready();
   }
 
-  if ( sim -> overrides.heroic_presence )
+  bool allow_heroic_presence = 
+    (race == RACE_NIGHT_ELF) ||
+    (race == RACE_GNOME)     ||
+    (race == RACE_DWARF)     ||
+    (race == RACE_HUMAN)     ||
+    (race == RACE_DRAENEI);
+
+  if ( sim -> overrides.heroic_presence && allow_heroic_presence )
   {
     buffs.heroic_presence -> trigger();
   }
@@ -3747,8 +3754,7 @@ action_expr_t* player_t::create_expression( action_t* a,
     }
     else if ( splits[ 0 ] == "cooldown" )
     {
-      cooldown_t* cooldown = find_cooldown( splits[ 1 ] );
-      if ( ! cooldown ) return 0;
+      cooldown_t* cooldown = get_cooldown( splits[ 1 ] );
       if ( splits[ 2 ] == "remains" )
       {
 	struct cooldown_remains_expr_t : public action_expr_t
@@ -3762,8 +3768,7 @@ action_expr_t* player_t::create_expression( action_t* a,
     }
     else if ( splits[ 0 ] == "dot" )
     {
-      dot_t* dot = find_dot( splits[ 1 ] );
-      if ( ! dot ) return 0;
+      dot_t* dot = get_dot( splits[ 1 ] );
       if ( splits[ 2 ] == "remains" )
       {
 	struct dot_remains_expr_t : public action_expr_t
