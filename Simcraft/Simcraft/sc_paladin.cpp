@@ -209,6 +209,34 @@ struct paladin_t : public player_t
     auto_attack = 0;
   }
 
+  ~paladin_t()
+  {
+    delete buffs_avenging_wrath;
+  delete buffs_divine_favor;
+  delete buffs_divine_illumination;
+  delete buffs_divine_plea;
+  delete buffs_holy_shield;
+  delete buffs_judgements_of_the_pure;
+  delete buffs_reckoning;
+  delete buffs_redoubt;
+  delete buffs_holy_vengeance;
+  delete buffs_the_art_of_war;
+  delete buffs_vengeance;
+  delete buffs_libram_of_avengement;
+  delete buffs_libram_of_divine_judgement;
+  delete buffs_libram_of_fortitude;
+  delete buffs_libram_of_furious_blows;
+  delete buffs_libram_of_reciprocation;
+  delete buffs_libram_of_valiance;
+  delete buffs_tier8_4pc_tank;
+
+  // Gains
+  delete  gains_divine_plea;
+  delete  gains_judgements_of_the_wise;
+  delete gains_seal_of_command_glyph;
+  delete  gains_seal_of_wisdom;
+  }
+
   virtual void      init_race();
   virtual void      init_base();
   virtual void      init_gains();

@@ -420,6 +420,32 @@ player_t::~player_t()
     rng_list = r -> next;
     delete r;
   }
+
+      delete buffs.arcane_brilliance;
+    delete buffs.berserking; 
+    delete buffs.blessing_of_kings;
+    delete buffs.blessing_of_might;
+    delete buffs.blessing_of_wisdom;
+    delete buffs.blood_fury_ap;
+    delete buffs.blood_fury_sp;
+    delete buffs.bloodlust;
+    delete buffs.demonic_pact;
+    delete buffs.divine_spirit;
+    delete buffs.focus_magic;
+    delete buffs.fortitude;
+    delete buffs.heroic_presence;
+    delete buffs.innervate;
+    delete buffs.mark_of_the_wild;
+    delete buffs.mongoose_mh;
+    delete buffs.mongoose_oh;
+    delete buffs.moving;
+    delete buffs.power_infusion;
+    delete buffs.hysteria;
+    delete buffs.replenishment;
+    delete buffs.stoneform;
+    delete buffs.stunned;
+    delete buffs.tricks_of_the_trade;
+
 }
 
 // player_t::id ============================================================
@@ -3326,7 +3352,7 @@ struct use_item_t : public action_t
     item = player -> find_item( item_name );
     if ( ! item )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Player %s attempting 'use_item' action with item '%s' which is not currently equipped.\n", player -> name(), item_name.c_str() );
+      //util_t::fprintf( sim -> output_file, "simulationcraft: Player %s attempting 'use_item' action with item '%s' which is not currently equipped.\n", player -> name(), item_name.c_str() );
       return;
     }
     if ( ! item -> use.active() )

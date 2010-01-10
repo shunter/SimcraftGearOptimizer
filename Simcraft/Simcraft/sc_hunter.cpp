@@ -197,6 +197,36 @@ struct hunter_t : public player_t
     summon_pet_str = "wolf";
   }
 
+  ~hunter_t()
+  {
+	    delete buffs_aspect_of_the_hawk;
+  delete buffs_aspect_of_the_viper;
+  delete buffs_beast_within;
+  delete buffs_call_of_the_wild;
+  delete buffs_cobra_strikes;
+  delete buffs_culling_the_herd;
+  delete buffs_expose_weakness;
+  delete buffs_furious_howl;
+  delete buffs_improved_aspect_of_the_hawk;
+  delete buffs_improved_steady_shot;
+  delete buffs_lock_and_load;
+  delete buffs_master_tactician;
+  delete buffs_rapid_fire;
+  delete buffs_trueshot_aura;
+  delete buffs_tier8_4pc;
+  delete buffs_tier10_2pc;
+  delete buffs_tier10_4pc;
+
+  // Gains
+  delete gains_chimera_viper;
+  delete gains_invigoration;
+  delete gains_rapid_recuperation;
+  delete gains_roar_of_recovery;
+  delete gains_thrill_of_the_hunt;
+  delete gains_viper_aspect_passive;
+  delete gains_viper_aspect_shot;
+  }
+
   // Character Definition
   virtual void      init_glyphs();
   virtual void      init_race();

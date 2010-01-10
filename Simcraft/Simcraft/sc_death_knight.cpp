@@ -323,6 +323,31 @@ struct death_knight_t : public player_t
   };
   runes_t _runes;
 
+  ~death_knight_t()
+  {
+	delete buffs_bloodworms;
+	delete buffs_bloody_vengeance;
+	delete buffs_bone_shield;
+	delete buffs_desolation;
+	delete buffs_deathchill;
+	delete buffs_icy_talons;
+	delete buffs_killing_machine;
+	delete buffs_rime;
+	delete buffs_scent_of_blood;
+	delete buffs_sigil_hanged_man;
+	delete buffs_sigil_virulence;
+	delete buffs_tier10_4pc_melee;
+	delete buffs_tier9_2pc_melee;
+	delete buffs_rune_of_the_fallen_crusader;
+	delete buffs_rune_of_razorice;
+	delete buffs_unbreakable_armor;
+
+	// Presences
+	delete buffs_blood_presence;
+	delete buffs_frost_presence;
+	delete buffs_unholy_presence;
+	}
+	
   death_knight_t( sim_t* sim, const std::string& name, int race_type = RACE_NONE ) :
       player_t( sim, DEATH_KNIGHT, name, race_type )
   {

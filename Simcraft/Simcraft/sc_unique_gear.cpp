@@ -28,6 +28,11 @@ struct stat_proc_callback_t : public action_callback_t
     buff = new stat_buff_t( p, n, stat, amount, max_stacks, duration, cooldown, proc_chance, false, reverse, rng_type );
   }
 
+	  ~stat_proc_callback_t()
+	  {
+		  delete buff;
+	  }
+
   virtual void activate()
   {
     action_callback_t::activate();

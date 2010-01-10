@@ -196,6 +196,30 @@ struct warlock_t : public player_t
     hasted_corruption = -1;
   }
 
+  ~warlock_t()
+  {
+	  
+  delete buffs_pet_sacrifice;
+  delete buffs_backdraft;
+  delete buffs_decimation;
+  delete buffs_demonic_empowerment;
+  delete buffs_demonic_frenzy;
+  delete buffs_empowered_imp;
+  delete buffs_eradication;
+  delete buffs_fel_armor;
+  delete buffs_haunted;
+  delete buffs_life_tap_glyph;
+  delete buffs_shadow_embrace;
+  delete buffs_metamorphosis;
+  delete buffs_molten_core;
+  delete buffs_pyroclasm;
+  delete buffs_shadow_trance;
+  delete buffs_tier7_2pc_caster;
+  delete buffs_tier7_4pc_caster;
+  delete buffs_tier10_4pc_caster;
+
+  }
+
   // Character Definition
   virtual void      init_glyphs();
   virtual void      init_race();

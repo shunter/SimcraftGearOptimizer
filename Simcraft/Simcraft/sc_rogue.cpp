@@ -230,6 +230,31 @@ struct rogue_t : public player_t
     tricks_of_the_trade_target = 0;
   }
 
+  ~rogue_t()
+  {
+	    delete buffs_adrenaline_rush;
+  delete buffs_blade_flurry;
+  delete buffs_cold_blood;
+  delete buffs_combo_points;
+  delete buffs_envenom;
+  delete buffs_hunger_for_blood;
+  delete buffs_killing_spree;
+  delete buffs_master_of_subtlety;
+  delete buffs_overkill;
+  delete buffs_poison_doses;
+  delete buffs_shadow_dance;
+  delete buffs_shadowstep;
+  delete buffs_shiv;
+  delete buffs_deadly_proc;
+  delete buffs_stealthed;
+  delete buffs_slice_and_dice;
+  delete buffs_tier9_2pc;
+
+  // Cooldowns
+  delete cooldowns_honor_among_thieves;
+  delete cooldowns_seal_fate;
+  }
+
   // Character Definition
   virtual void      init_glyphs();
   virtual void      init_race();

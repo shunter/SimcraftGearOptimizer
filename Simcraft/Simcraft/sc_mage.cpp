@@ -204,6 +204,36 @@ struct mage_t : public player_t
     fof_on_cast = 0;
   }
 
+  ~mage_t()
+  {
+	   delete buffs_arcane_blast;
+  delete buffs_arcane_power;
+  delete buffs_brain_freeze;
+  delete buffs_clearcasting;
+  delete buffs_combustion;
+  delete buffs_fingers_of_frost;
+  delete buffs_focus_magic_feedback;
+  delete buffs_ghost_charge;
+  delete buffs_hot_streak;
+  delete buffs_hot_streak_crits;
+  delete buffs_icy_veins;
+  delete buffs_incanters_absorption;
+  delete buffs_mage_armor;
+  delete buffs_missile_barrage;
+  delete buffs_molten_armor;
+  delete buffs_tier7_2pc;
+  delete buffs_tier8_2pc;
+  delete buffs_tier10_2pc;
+  delete buffs_tier10_4pc;
+
+  // Gains
+  delete  gains_clearcasting;
+  delete  gains_empowered_fire;
+  delete  gains_evocation;
+  delete  gains_mana_gem;
+  delete  gains_master_of_elements;
+  }
+
   // Character Definition
   virtual void      init_race();
   virtual void      init_base();

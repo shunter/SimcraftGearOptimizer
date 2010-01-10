@@ -2527,6 +2527,18 @@ struct armory_t
   static void fuzzy_stats( std::string& encoding, const std::string& description );
   static int  parse_meta_gem( const std::string& description );
   static std::string& format( std::string& name, int format_type = FORMAT_DEFAULT );
+
+  
+  static bool parse_item_weapon( item_t& item,
+                               xml_node_t* xml );
+static bool parse_item_stats( item_t& item,
+                              xml_node_t* xml );
+static bool parse_item_name( item_t& item,
+                             xml_node_t* node );
+
+static bool parse_item_gems( item_t& item,
+                             xml_node_t* xml );
+
 };
 
 // Wowhead  ==================================================================

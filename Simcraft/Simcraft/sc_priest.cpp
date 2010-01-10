@@ -185,6 +185,32 @@ struct priest_t : public player_t
     cooldowns_shadow_fiend = get_cooldown( "shadow_fiend" );
   }
 
+  ~priest_t()
+  {
+	   delete  buffs_devious_mind;
+  delete  buffs_glyph_of_shadow;
+  delete  buffs_improved_spirit_tap;
+  delete  buffs_inner_fire;
+  delete  buffs_inner_fire_armor;
+  delete  buffs_shadow_form;
+  delete  buffs_shadow_weaving;
+  delete  buffs_surge_of_light;
+  delete  buffs_vampiric_embrace;
+
+  // Cooldowns
+  delete  cooldowns_mind_blast;
+  delete  cooldowns_shadow_fiend;
+
+  // Gains
+  delete  gains_devious_mind;
+  delete  gains_dispersion;
+  delete  gains_glyph_of_shadow_word_pain;
+  delete  gains_improved_spirit_tap;
+  delete  gains_shadow_fiend;
+  delete gains_surge_of_light;
+
+  }
+
   // Character Definition
   virtual void      init_glyphs();
   virtual void      init_race();

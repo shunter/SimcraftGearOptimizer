@@ -228,6 +228,36 @@ struct druid_t : public player_t
     eclipse_cycle = "solar";
   }
 
+  ~druid_t()
+  {
+  delete buffs_berserk;
+  delete buffs_bear_form;
+  delete buffs_cat_form;
+  delete buffs_combo_points;
+  delete buffs_corruptor;
+  delete buffs_eclipse_lunar;
+  delete buffs_eclipse_solar;
+  delete buffs_enrage;
+  delete buffs_glyph_of_innervate;
+  delete buffs_lacerate;
+  delete buffs_lunar_fury;
+  delete buffs_moonkin_form;
+  delete buffs_mutilation;
+  delete buffs_natures_grace;
+  delete buffs_natures_swiftness;
+  delete buffs_omen_of_clarity;
+  delete buffs_savage_roar;
+  delete buffs_stealthed;
+  delete buffs_t8_4pc_caster;
+  delete buffs_t10_2pc_caster;
+  delete buffs_terror;
+  delete buffs_tigers_fury;
+  delete buffs_unseen_moon;
+  delete buffs_t10_feral_relic;
+  delete buffs_t10_balance_relic;
+
+  }
+
   // Character Definition
   virtual void      init_glyphs();
   virtual void      init_race();

@@ -218,10 +218,10 @@ static xml_node_t* download_item_tooltip( player_t* p,
 
   return node;
 }
-
+}
 // parse_item_name ==========================================================
 
-static bool parse_item_name( item_t& item,
+bool armory_t::parse_item_name( item_t& item,
                              xml_node_t* node )
 {
   if ( ! xml_t::get_value( item.armory_id_str,   node, "id/."   ) ) return false;
@@ -234,7 +234,7 @@ static bool parse_item_name( item_t& item,
 
 // parse_item_stats =========================================================
 
-static bool parse_item_stats( item_t& item,
+bool armory_t::parse_item_stats( item_t& item,
                               xml_node_t* xml )
 {
   std::string& s = item.armory_stats_str;
@@ -294,10 +294,10 @@ static bool parse_item_stats( item_t& item,
 
   return true;
 }
-
+namespace {
 // parse_item_gems ==========================================================
-
-static bool parse_item_gems( item_t& item,
+}
+bool armory_t::parse_item_gems( item_t& item,
                              xml_node_t* xml )
 {
   item.armory_gems_str.clear();
@@ -366,7 +366,7 @@ static bool parse_item_gems( item_t& item,
 
   return true;
 }
-
+namespace {
 // parse_item_enchant =======================================================
 
 static bool parse_item_enchant( item_t& item,
@@ -406,8 +406,8 @@ static bool parse_item_enchant( item_t& item,
 }
 
 // parse_item_weapon ========================================================
-
-static bool parse_item_weapon( item_t& item,
+}
+bool armory_t::parse_item_weapon( item_t& item,
                                xml_node_t* xml )
 {
   item.armory_weapon_str.clear();
@@ -451,7 +451,7 @@ static bool parse_item_weapon( item_t& item,
 
   return true;
 }
-
+namespace {
 } // ANONYMOUS NAMESPACE ===================================================
 
 // armory_t::fuzzy_stats ====================================================
@@ -926,19 +926,19 @@ bool armory_t::download_item( item_t& item,
     return false;
   }
 
-  if ( ! parse_item_name( item, item_xml ) )
+  if ( ! armory_t::parse_item_name( item, item_xml ) )
   {
     util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to parse name for item %s at slot %s.\n", p -> name(), id_str.c_str(), item.slot_name() );
     return false;
   }
 
-  if ( ! parse_item_stats( item, item_xml ) )
+  if ( ! armory_t::parse_item_stats( item, item_xml ) )
   {
     util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to parse stats for item \"%s\" at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
-  if ( ! parse_item_weapon( item, item_xml ) )
+  if ( ! armory_t::parse_item_weapon( item, item_xml ) )
   {
     util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to parse weapon info for item \"%s\" at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;

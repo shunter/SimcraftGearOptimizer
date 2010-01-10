@@ -198,6 +198,47 @@ struct shaman_t : public player_t
     flametongue_weapon_spell = 0;
   }
 
+  ~shaman_t()
+  {
+	    delete buffs_avalanche;
+  delete buffs_dueling;
+  delete buffs_electrifying_wind;
+  delete buffs_elemental_devastation;
+  delete buffs_elemental_focus;
+  delete buffs_elemental_mastery;
+  delete buffs_flurry;
+  delete buffs_indomitability;
+  delete buffs_lightning_shield;
+  delete buffs_maelstrom_weapon;
+  delete buffs_nature_vulnerability;
+  delete buffs_natures_swiftness;
+  delete buffs_quaking_earth;
+  delete buffs_shamanistic_rage;
+  delete buffs_shattered_ice;
+  delete buffs_stonebreaker;  
+  delete buffs_tier10_2pc_melee;
+  delete buffs_tier10_4pc_melee;
+  delete buffs_totem_of_wrath_glyph;
+  delete buffs_tundra;
+  delete buffs_water_shield;
+
+  // Cooldowns
+  delete cooldowns_elemental_mastery;
+  delete cooldowns_lava_burst;
+  delete cooldowns_windfury_weapon;
+
+  // Gains
+  delete gains_improved_stormstrike;
+  delete gains_shamanistic_rage;
+  delete gains_thunderstorm;
+  delete gains_water_shield;
+
+  // Procs
+  delete procs_lightning_overload;
+  delete procs_windfury;
+
+  }
+
   // Character Definition
   virtual void      init_rating();
   virtual void      init_glyphs();

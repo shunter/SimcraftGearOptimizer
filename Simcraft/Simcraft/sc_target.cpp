@@ -25,6 +25,43 @@ target_t::target_t( sim_t* s ) :
 
 target_t::~target_t()
 {
+	delete debuffs.bleeding;
+    delete debuffs.blood_frenzy;
+    delete debuffs.casting;
+    delete debuffs.crypt_fever;
+    delete debuffs.blood_plague;
+    delete debuffs.curse_of_elements;
+    delete debuffs.earth_and_moon;
+    delete debuffs.ebon_plaguebringer;
+    delete debuffs.faerie_fire;
+    delete debuffs.frostbite;
+    delete debuffs.frost_fever;
+    delete debuffs.heart_of_the_crusader;
+    delete debuffs.hunters_mark;
+    delete debuffs.improved_faerie_fire;
+    delete debuffs.improved_scorch;
+    delete debuffs.improved_shadow_bolt;
+    delete debuffs.infected_wounds;
+    delete debuffs.insect_swarm;
+    delete debuffs.invulnerable;
+    delete debuffs.judgement_of_wisdom;
+    delete debuffs.judgements_of_the_just;
+    delete debuffs.mangle;
+    delete debuffs.misery;
+    delete debuffs.scorpid_sting;
+    delete debuffs.slow;
+    delete debuffs.sunder_armor;
+    delete debuffs.thunder_clap;
+    delete debuffs.totem_of_wrath;
+    delete debuffs.trauma;
+    delete debuffs.vulnerable;
+    delete debuffs.winters_chill;
+    delete debuffs.winters_grasp;
+    delete debuffs.master_poisoner;
+    delete debuffs.poisoned;
+    delete debuffs.savage_combat;
+    delete debuffs.expose_armor;
+    delete debuffs.hemorrhage;
 }
 
 // target_t::id =============================================================

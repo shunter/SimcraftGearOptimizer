@@ -472,6 +472,30 @@ sim_t::~sim_t()
     delete children[ i ];
   }
   if ( timing_wheel ) delete[] timing_wheel;
+
+      delete auras.abominations_might;
+    delete auras.arcane_empowerment;
+    delete auras.battle_shout;
+    delete auras.celerity;
+    delete auras.devotion_aura;
+    delete auras.elemental_oath;
+    delete auras.ferocious_inspiration;
+    delete auras.flametongue_totem;
+    delete auras.horn_of_winter;
+    delete auras.improved_moonkin;
+    delete auras.improved_icy_talons;
+    delete auras.leader_of_the_pack;
+    delete auras.mana_spring_totem;
+    delete auras.moonkin;
+    delete auras.rampage;
+    delete auras.sanctified_retribution;
+    delete auras.strength_of_earth;
+    delete auras.swift_retribution;
+    delete auras.totem_of_wrath;
+    delete auras.trueshot;
+    delete auras.unleashed_rage;
+    delete auras.windfury_totem;
+    delete auras.wrath_of_air;
 }
 
 // sim_t::add_event ==========================================================
