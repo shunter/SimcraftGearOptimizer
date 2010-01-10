@@ -196,7 +196,6 @@ struct warlock_t : public player_t
   ~warlock_t()
   {
 	  
-  delete buffs_pet_sacrifice;
   delete buffs_backdraft;
   delete buffs_decimation;
   delete buffs_demonic_empowerment;
