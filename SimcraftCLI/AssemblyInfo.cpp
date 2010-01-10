@@ -12,11 +12,11 @@ using namespace System::Security::Permissions;
 // associated with an assembly.
 //
 [assembly:AssemblyTitleAttribute("SimcraftCLI")];
-[assembly:AssemblyDescriptionAttribute("")];
+[assembly:AssemblyDescriptionAttribute("C++/CLI interface to Simcraft")];
 [assembly:AssemblyConfigurationAttribute("")];
-[assembly:AssemblyCompanyAttribute("Microsoft")];
+[assembly:AssemblyCompanyAttribute("")];
 [assembly:AssemblyProductAttribute("SimcraftCLI")];
-[assembly:AssemblyCopyrightAttribute("Copyright (c) Microsoft 2009")];
+[assembly:AssemblyCopyrightAttribute("Copyright (c) 2009")];
 [assembly:AssemblyTrademarkAttribute("")];
 [assembly:AssemblyCultureAttribute("")];
 
