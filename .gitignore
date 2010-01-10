@@ -1,4 +1,10 @@
+*.log
+Release
+Debug
+*.vcxproj.user
 *.csproj.user
 *.suo
 bin
 obj
+*.opensdf
+*.sdf
