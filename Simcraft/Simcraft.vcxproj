@@ -1,0 +1,141 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Simcraft\sc_action.cpp" />
+    <ClCompile Include="Simcraft\sc_armory.cpp" />
+    <ClCompile Include="Simcraft\sc_attack.cpp" />
+    <ClCompile Include="Simcraft\sc_buff.cpp" />
+    <ClCompile Include="Simcraft\sc_chart.cpp" />
+    <ClCompile Include="Simcraft\sc_consumable.cpp" />
+    <ClCompile Include="Simcraft\sc_death_knight.cpp" />
+    <ClCompile Include="Simcraft\sc_druid.cpp" />
+    <ClCompile Include="Simcraft\sc_enchant.cpp" />
+    <ClCompile Include="Simcraft\sc_event.cpp" />
+    <ClCompile Include="Simcraft\sc_expressions.cpp" />
+    <ClCompile Include="Simcraft\sc_gear_stats.cpp" />
+    <ClCompile Include="Simcraft\sc_http.cpp" />
+    <ClCompile Include="Simcraft\sc_hunter.cpp" />
+    <ClCompile Include="Simcraft\sc_item.cpp" />
+    <ClCompile Include="Simcraft\sc_js.cpp" />
+    <ClCompile Include="Simcraft\sc_log.cpp" />
+    <ClCompile Include="Simcraft\sc_mage.cpp" />
+    <ClCompile Include="Simcraft\sc_main.cpp" />
+    <ClCompile Include="Simcraft\sc_mmo_champion.cpp" />
+    <ClCompile Include="Simcraft\sc_option.cpp" />
+    <ClCompile Include="Simcraft\sc_paladin.cpp" />
+    <ClCompile Include="Simcraft\sc_pet.cpp" />
+    <ClCompile Include="Simcraft\sc_player.cpp" />
+    <ClCompile Include="Simcraft\sc_plot.cpp" />
+    <ClCompile Include="Simcraft\sc_priest.cpp" />
+    <ClCompile Include="Simcraft\sc_raid_event.cpp" />
+    <ClCompile Include="Simcraft\sc_rating.cpp" />
+    <ClCompile Include="Simcraft\sc_rawr.cpp" />
+    <ClCompile Include="Simcraft\sc_report.cpp" />
+    <ClCompile Include="Simcraft\sc_rng.cpp" />
+    <ClCompile Include="Simcraft\sc_rogue.cpp" />
+    <ClCompile Include="Simcraft\sc_scaling.cpp" />
+    <ClCompile Include="Simcraft\sc_sequence.cpp" />
+    <ClCompile Include="Simcraft\sc_set_bonus.cpp" />
+    <ClCompile Include="Simcraft\sc_shaman.cpp" />
+    <ClCompile Include="Simcraft\sc_sim.cpp" />
+    <ClCompile Include="Simcraft\sc_spell.cpp" />
+    <ClCompile Include="Simcraft\sc_stats.cpp" />
+    <ClCompile Include="Simcraft\sc_target.cpp" />
+    <ClCompile Include="Simcraft\sc_thread.cpp" />
+    <ClCompile Include="Simcraft\sc_unique_gear.cpp" />
+    <ClCompile Include="Simcraft\sc_util.cpp" />
+    <ClCompile Include="Simcraft\sc_warlock.cpp" />
+    <ClCompile Include="Simcraft\sc_warrior.cpp" />
+    <ClCompile Include="Simcraft\sc_weapon.cpp" />
+    <ClCompile Include="Simcraft\sc_wowhead.cpp" />
+    <ClCompile Include="Simcraft\sc_xml.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Simcraft\simulationcraft.h" />
+    <ClInclude Include="vs\stdint.h" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{50E4674E-B322-40AD-B09A-060881F6C694}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>Simcraft</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <MinimalRebuild>true</MinimalRebuild>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;SIMCRAFT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>wininet.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>MaxSpeed</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;SIMCRAFT_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>wininet.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
