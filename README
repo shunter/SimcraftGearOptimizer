@@ -1,0 +1,22 @@
+Simcraft Gear Optimizer
+
+This application attempts to find the best combination of items for a World of Warcraft character, that is, the 
+set that will produce the highest DPS.  It performs a brute-force search of every possible combination of items by
+running SimulationCraft ( http://code.google.com/p/simulationcraft/ ) on each set, and reporting the highest dps obtained 
+and the gear set.
+
+Caveat: I only use it on my warlock, so at this point the gemming logic is hardcoded for my needs.  It's not exactly 
+fast, though that depends on how many items you are comparing, and the settings for the simulations.  On my Q9300 I get 
+about 30 sets completed per second.
+
+It's a C# 4 application built using VS 2010 beta 2, partly as an excuse to play with Parallel LINQ.  Simcraft is built into 
+a C++/CLI assembly in order to evaluate each set.  I hacked up the Simcraft C++ in a few places to reduce the speed at which it 
+leaks memory, as well as get access to some methods, etc.
+
+To run, make a file named items.txt in the Data directory and put the item IDs of the items to search in there, one per line.  
+You can use # at the start of a line to comment something out, and you can put the name of each item separated by a comma, 
+e.g. "47617,Icehowl Cinch".  The name is only for your reference when editing the file, the name it prints out when running 
+comes from the item XML info that is pulled down from Wowhead.
+
+You also need to make a file called default.simc that contains the options for each run (except for the items which are 
+filled in by the program separately for each gear set).
