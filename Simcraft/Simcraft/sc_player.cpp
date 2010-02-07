@@ -34,22 +34,8 @@ struct judgement_of_wisdom_callback_t : public action_callback_t
     double base_mana = p -> resource_base[ RESOURCE_MANA ];
 
     double PPM = 15.0;
-    double proc_chance = 0;
 
-    if ( a -> weapon )
-    {
-      proc_chance = a -> weapon -> proc_chance_on_swing( PPM, a -> time_to_execute );
-    }
-    else
-    {
-      double time_to_execute = a -> channeled ? a -> time_to_tick : a -> time_to_execute;
-
-      if ( time_to_execute == 0 ) time_to_execute = p -> base_gcd;
-
-      proc_chance = PPM * time_to_execute / 60.0;
-    }
-
-    if ( ! rng -> roll( proc_chance ) )
+    if ( ! rng -> roll( a -> ppm_proc_chance( PPM ) ) )
       return;
 
     proc -> occur();
@@ -312,6 +298,8 @@ player_t::player_t( sim_t*             s,
     armor_per_agility( 0 ), initial_armor_per_agility( 2.0 ),
     dodge_per_agility( 0 ), initial_dodge_per_agility( 0 ),
     diminished_miss_capi( 0 ), diminished_dodge_capi( 0 ), diminished_parry_capi( 0 ), diminished_kfactor( 0 ),
+    // Attacks
+    main_hand_attack( 0 ), off_hand_attack( 0 ), ranged_attack( 0 ),
     // Resources
     mana_per_intellect( 0 ), health_per_stamina( 0 ),
     // Consumables
@@ -510,10 +498,10 @@ bool player_t::init( sim_t* sim )
       {
         player_t* p = sim -> find_player( player_names[ j ] );
         if ( ! p ) 
-	{
-	  util_t::fprintf( sim -> output_file, "simulationcraft: ERROR! Unable to find player %s\n", player_names[ j ].c_str() );
-	  return false;
-	}
+        {
+          util_t::fprintf( sim -> output_file, "simulationcraft: ERROR! Unable to find player %s\n", player_names[ j ].c_str() );
+          return false;
+        }
         p -> party = party_index;
         p -> member = member_index++;
         for ( pet_t* pet = p -> pet_list; pet; pet = pet -> next_pet )
@@ -646,6 +634,7 @@ void player_t::init_meta_gem( gear_stats_t& item_stats )
   else if ( meta_gem == META_IMPASSIVE_STARFLARE     ) item_stats.crit_rating += 17;
   else if ( meta_gem == META_INSIGHTFUL_EARTHSIEGE   ) item_stats.attribute[ ATTR_INTELLECT ] += 21;
   else if ( meta_gem == META_INSIGHTFUL_EARTHSTORM   ) item_stats.attribute[ ATTR_INTELLECT ] += 12;
+  else if ( meta_gem == META_INVIGORATING_EARTHSIEGE ) item_stats.attack_power += 42;
   else if ( meta_gem == META_PERSISTENT_EARTHSHATTER ) item_stats.attack_power += 34;
   else if ( meta_gem == META_PERSISTENT_EARTHSIEGE   ) item_stats.attack_power += 42;
   else if ( meta_gem == META_POWERFUL_EARTHSHATTER   ) item_stats.attribute[ ATTR_STAMINA ] += 26;
@@ -980,8 +969,13 @@ void player_t::init_buffs()
   buffs.stunned = new buff_t( this, "stunned", -1 );
 
   // stat_buff_t( sim, player, name, stat, amount, max_stack, duration, cooldown, proc_chance, quiet )
-  buffs.blood_fury_ap   = new stat_buff_t( this, "blood_fury_ap", STAT_ATTACK_POWER, ( level * 4 ) + 2, 1, 15.0 );
-  buffs.blood_fury_sp   = new stat_buff_t( this, "blood_fury_sp", STAT_SPELL_POWER,  ( level * 2 ) + 3, 1, 15.0 );
+  buffs.blood_fury_ap          = new stat_buff_t( this, "blood_fury_ap",          STAT_ATTACK_POWER, ( level * 4 ) + 2, 1, 15.0 );
+  buffs.blood_fury_sp          = new stat_buff_t( this, "blood_fury_sp",          STAT_SPELL_POWER,  ( level * 2 ) + 3, 1, 15.0 );
+  buffs.destruction_potion     = new stat_buff_t( this, "destruction_potion",     STAT_SPELL_POWER,  120.0,             1, 15.0, 60.0 );
+  buffs.indestructible_potion  = new stat_buff_t( this, "indestructible_potion",  STAT_ARMOR,        3500.0,            1, 15.0, 60.0 );
+  buffs.speed_potion           = new stat_buff_t( this, "speed_potion",           STAT_HASTE_RATING, 500.0,             1, 15.0, 60.0 );
+  buffs.wild_magic_potion_sp   = new stat_buff_t( this, "wild_magic_potion_sp",   STAT_SPELL_POWER,  200.0,             1, 15.0, 60.0 );
+  buffs.wild_magic_potion_crit = new stat_buff_t( this, "wild_magic_potion_crit", STAT_CRIT_RATING,  200.0,             1, 15.0, 60.0 );
 }
 
 // player_t::init_gains ====================================================
@@ -1658,6 +1652,8 @@ double player_t::composite_spell_crit() SC_CONST
     {
       sc += 0.05;
     }
+
+    if ( buffs.destruction_potion -> check() ) sc += 0.02;
   }
 
   return sc;
@@ -1705,6 +1701,14 @@ double player_t::composite_attribute_multiplier( int attr ) SC_CONST
 {
   double m = attribute_multiplier[ attr ];
   if ( buffs.blessing_of_kings -> check() ) m *= 1.10;
+  return m;
+}
+
+// player_t::composite_player_multiplier ================================
+
+double player_t::composite_player_multiplier( int school ) SC_CONST
+{
+  double m = 1.0;
   return m;
 }
 
@@ -1972,10 +1976,14 @@ void player_t::reset()
     action_callback_t::reset( spell_result_callbacks        [ i ] );
     action_callback_t::reset( attack_direct_result_callbacks[ i ] );
     action_callback_t::reset( spell_direct_result_callbacks [ i ] );
+    action_callback_t::reset( spell_cast_result_callbacks   [ i ] );
+  }
+  for ( int i=0; i < SCHOOL_MAX; i++ )
+  {
+    action_callback_t::reset( tick_damage_callbacks         [ i ] );
+    action_callback_t::reset( direct_damage_callbacks       [ i ] );
   }
   action_callback_t::reset( tick_callbacks );
-  action_callback_t::reset( tick_damage_callbacks );
-  action_callback_t::reset( direct_damage_callbacks );
 
   replenishment_targets.clear();
 
@@ -2031,17 +2039,17 @@ void player_t::schedule_ready( double delta_time,
         double   gcd_lag = rngs.lag_gcd   -> gauss( sim ->   gcd_lag, sim ->   gcd_lag_stddev );
         double queue_lag = rngs.lag_queue -> gauss( sim -> queue_lag, sim -> queue_lag_stddev );
 
-	double diff = ( gcd_ready + gcd_lag ) - ( sim -> current_time + queue_lag );
+        double diff = ( gcd_ready + gcd_lag ) - ( sim -> current_time + queue_lag );
 
-	if ( diff > 0 && ( last_foreground_action -> time_to_execute == 0 || sim -> strict_gcd_queue ) )
-	{
-	  lag = gcd_lag;
-	}
-	else
-	{
-	  lag = queue_lag;
-	  action_queued = true;
-	}
+        if ( diff > 0 && ( last_foreground_action -> time_to_execute == 0 || sim -> strict_gcd_queue ) )
+        {
+          lag = gcd_lag;
+        }
+        else
+        {
+          lag = queue_lag;
+          action_queued = true;
+        }
       }
     }
 
@@ -2106,7 +2114,7 @@ action_t* player_t::execute_action()
   for ( action = action_list; action; action = action -> next )
   {
     if ( action -> background ||
-	 action -> sequence )
+         action -> sequence )
       continue;
 
     if ( action -> ready() )
@@ -2543,16 +2551,44 @@ void player_t::register_tick_callback( action_callback_t* cb )
 
 // player_t::register_tick_damage_callback ==================================
 
-void player_t::register_tick_damage_callback( action_callback_t* cb )
+void player_t::register_tick_damage_callback( int                mask,
+                                              action_callback_t* cb )
 {
-  tick_damage_callbacks.push_back( cb );
+  for ( int i=0; i < SCHOOL_MAX; i++ )
+  {
+    if ( mask < 0 || ( mask & ( 1 << i ) ) )
+    {
+      tick_damage_callbacks[ i ].push_back( cb );
+    }
+  }
 }
 
 // player_t::register_direct_damage_callback ================================
 
-void player_t::register_direct_damage_callback( action_callback_t* cb )
+void player_t::register_direct_damage_callback( int                mask,
+                                                action_callback_t* cb )
 {
-  direct_damage_callbacks.push_back( cb );
+  for ( int i=0; i < SCHOOL_MAX; i++ )
+  {
+    if ( mask < 0 || ( mask & ( 1 << i ) ) )
+    {
+      direct_damage_callbacks[ i ].push_back( cb );
+    }
+  }
+}
+
+// player_t::register_spell_cast_result_callback =================================
+
+void player_t::register_spell_cast_result_callback( int                mask,
+                                                    action_callback_t* cb )
+{
+  for ( int i=0; i < RESULT_MAX; i++ )
+  {
+    if ( mask < 0 || ( mask & ( 1 << i ) ) )
+    {
+      spell_cast_result_callbacks[ i ].push_back( cb );
+    }
+  }
 }
 
 // player_t::recalculate_haste ==============================================
@@ -3383,8 +3419,8 @@ struct use_item_t : public action_t
     }
     else if ( e.stat )
     {
-      if( e.max_stacks  <= 0 ) e.max_stacks  = 1;
-      if( e.proc_chance <= 0 ) e.proc_chance = 1;
+      if( e.max_stacks  == 0 ) e.max_stacks  = 1;
+      if( e.proc_chance == 0 ) e.proc_chance = 1;
       
       buff = new stat_buff_t( player, use_name, e.stat, e.amount, e.max_stacks, e.duration, 0, e.proc_chance, false, e.reverse );
     }
@@ -3691,7 +3727,7 @@ bool player_t::parse_talents_wowhead( const std::string& talent_string )
 // player_t::create_expression ==============================================
 
 action_expr_t* player_t::create_expression( action_t* a,
-					    const std::string& name_str )
+                                            const std::string& name_str )
 {
   int resource_type = util_t::parse_resource_type( name_str );
   if ( resource_type != RESOURCE_NONE )
@@ -3709,7 +3745,7 @@ action_expr_t* player_t::create_expression( action_t* a,
     struct mana_pct_expr_t : public action_expr_t
     {
       mana_pct_expr_t( action_t* a ) : action_expr_t( a, "mana_pct", TOK_NUM ) {}
-      virtual int evaluate() { player_t* p = action -> player; result_num = ( p -> resource_current[ RESOURCE_MANA ] / p -> resource_max[ RESOURCE_MANA ] ); return TOK_NUM; }
+      virtual int evaluate() { player_t* p = action -> player; result_num = 100 * ( p -> resource_current[ RESOURCE_MANA ] / p -> resource_max[ RESOURCE_MANA ] ); return TOK_NUM; }
     };
     return new mana_pct_expr_t( a );
   }
@@ -3757,13 +3793,13 @@ action_expr_t* player_t::create_expression( action_t* a,
       cooldown_t* cooldown = get_cooldown( splits[ 1 ] );
       if ( splits[ 2 ] == "remains" )
       {
-	struct cooldown_remains_expr_t : public action_expr_t
-	{
-	  cooldown_t* cooldown;
-	  cooldown_remains_expr_t( action_t* a, cooldown_t* c ) : action_expr_t( a, "cooldown_remains", TOK_NUM ), cooldown(c) {}
-	  virtual int evaluate() { result_num = cooldown -> remains(); return TOK_NUM; }
-	};
-	return new cooldown_remains_expr_t( a, cooldown );
+        struct cooldown_remains_expr_t : public action_expr_t
+        {
+          cooldown_t* cooldown;
+          cooldown_remains_expr_t( action_t* a, cooldown_t* c ) : action_expr_t( a, "cooldown_remains", TOK_NUM ), cooldown(c) {}
+          virtual int evaluate() { result_num = cooldown -> remains(); return TOK_NUM; }
+        };
+        return new cooldown_remains_expr_t( a, cooldown );
       }
     }
     else if ( splits[ 0 ] == "dot" )
@@ -3771,13 +3807,38 @@ action_expr_t* player_t::create_expression( action_t* a,
       dot_t* dot = get_dot( splits[ 1 ] );
       if ( splits[ 2 ] == "remains" )
       {
-	struct dot_remains_expr_t : public action_expr_t
-	{
-	  dot_t* dot;
-	  dot_remains_expr_t( action_t* a, dot_t* d ) : action_expr_t( a, "dot_remains", TOK_NUM ), dot(d) {}
-	  virtual int evaluate() { result_num = dot -> remains(); return TOK_NUM; }
-	};
-	return new dot_remains_expr_t( a, dot );
+        struct dot_remains_expr_t : public action_expr_t
+        {
+          dot_t* dot;
+          dot_remains_expr_t( action_t* a, dot_t* d ) : action_expr_t( a, "dot_remains", TOK_NUM ), dot(d) {}
+          virtual int evaluate() { result_num = dot -> remains(); return TOK_NUM; }
+        };
+        return new dot_remains_expr_t( a, dot );
+      }
+    }
+    else if ( splits[ 0 ] == "swing" )
+    {
+      std::string& s = splits[ 1 ];
+      int hand = SLOT_NONE;
+      if ( s == "mh" || s == "mainhand" || s == "main_hand" ) hand = SLOT_MAIN_HAND;
+      if ( s == "oh" || s ==  "offhand" || s ==  "off_hand" ) hand = SLOT_OFF_HAND;
+      if ( hand == SLOT_NONE ) return 0;
+      if ( splits[ 2 ] == "remains" )
+      {
+        struct swing_remains_expr_t : public action_expr_t
+        {
+	  int slot;
+          swing_remains_expr_t( action_t* a, int s ) : action_expr_t( a, "swing_remains", TOK_NUM ), slot(s) {}
+          virtual int evaluate() 
+	  { 
+	    result_num = 9999;
+	    player_t* p = action -> player;
+	    attack_t* attack = ( slot == SLOT_MAIN_HAND ) ? p -> main_hand_attack : p -> off_hand_attack;
+	    if ( attack && attack -> execute_event ) result_num = attack -> execute_event -> occurs() - action -> sim -> current_time;
+	    return TOK_NUM; 
+	  }
+        };
+        return new swing_remains_expr_t( a, hand );
       }
     }
   }

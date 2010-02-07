@@ -1327,9 +1327,10 @@ struct arcane_missiles_tick_t : public mage_spell_t
     };
     init_rank( ranks, 42846 );
 
-    dual       = true;
-    background = true;
-    may_crit   = true;
+    dual        = true;
+    background  = true;
+    may_crit    = true;
+    direct_tick = true;
 
     direct_power_mod  = 1.0 / 3.5; // bonus per missle
 
@@ -3303,7 +3304,9 @@ void mage_t::init_actions()
 {
   if ( action_list_str.empty() )
   {
-    action_list_str = "flask,type=frost_wyrm/food,type=fish_feast/arcane_brilliance";
+    action_list_str = "flask,type=frost_wyrm/food,type=fish_feast";
+    if ( talents.summon_water_elemental ) action_list_str += "/water_elemental";
+    action_list_str += "/arcane_brilliance";
     if ( talents.focus_magic ) action_list_str += "/focus_magic";
     action_list_str += "/snapshot_stats";
     action_list_str += "/counterspell";
@@ -3370,8 +3373,7 @@ void mage_t::init_actions()
       action_list_str += "/mana_gem/speed_potion";
       action_list_str += "/deep_freeze";
       action_list_str += "/frost_bolt,frozen=1";
-      if ( talents.summon_water_elemental ) action_list_str += "/water_elemental";
-      if ( talents.cold_snap              ) action_list_str += "/cold_snap";
+      if ( talents.cold_snap              ) action_list_str += "/cold_snap,if=cooldown.deep_freeze.remains>15";
       if ( talents.brain_freeze           ) action_list_str += "/fire_ball,brain_freeze=1";
       action_list_str += "/mirror_image";
       action_list_str += "/frost_bolt";

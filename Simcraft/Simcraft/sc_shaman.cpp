@@ -68,10 +68,6 @@ struct shaman_t : public player_t
   rng_t* rng_static_shock;
   rng_t* rng_windfury_weapon;
 
-  // Auto-Attack
-  attack_t* main_hand_attack;
-  attack_t*  off_hand_attack;
-
   // Weapon Enchants
   attack_t* windfury_weapon_attack;
   spell_t*  flametongue_weapon_spell;
@@ -188,10 +184,6 @@ struct shaman_t : public player_t
     cooldowns_elemental_mastery = get_cooldown( "elemental_mastery" );
     cooldowns_lava_burst        = get_cooldown( "lava_burst"        );
     cooldowns_windfury_weapon   = get_cooldown( "windfury_weapon"   );
-
-    // Auto-Attack
-    main_hand_attack = 0;
-    off_hand_attack  = 0;
 
     // Weapon Enchants
     windfury_weapon_attack   = 0;
@@ -690,7 +682,7 @@ static void trigger_lightning_overload( spell_t* s,
     s -> pseudo_pet           = true; // Prevent Honor Among Thieves
     s -> base_cost            = 0;
     s -> base_multiplier     /= 2.0;
-    s -> direct_power_mod    += p -> talents.shamanism * 0.03; // Reapplied here because Shamanism isn't affected by the *0.5.
+    s -> direct_power_mod    += p -> talents.shamanism * 0.04; // Reapplied here because Shamanism isn't affected by the *0.5.
     s -> stats                = lightning_overload_stats;
 
     s -> time_to_execute      = 0;
@@ -1187,7 +1179,7 @@ struct chain_lightning_t : public shaman_spell_t
     base_execute_time    = 2.0;
     may_crit             = true;
     direct_power_mod     = ( base_execute_time / 3.5 );
-    direct_power_mod    += p -> talents.shamanism * 0.03;
+    direct_power_mod    += p -> talents.shamanism * 0.04;
     base_execute_time   -= p -> talents.lightning_mastery * 0.1;
     base_cost_reduction += p -> talents.convection * 0.02;
     base_multiplier     *= 1.0 + p -> talents.concussion * 0.01;
@@ -1318,7 +1310,7 @@ struct lightning_bolt_t : public shaman_spell_t
     base_hit            += p -> talents.elemental_precision * 0.01;
     base_crit           += p -> talents.call_of_thunder * 0.05;
     base_crit           += p -> talents.tidal_mastery * 0.01;
-    direct_power_mod    += p -> talents.shamanism * 0.03;
+    direct_power_mod    += p -> talents.shamanism * 0.04;
 
     base_crit_bonus_multiplier *= 1.0 + p -> talents.elemental_fury * 0.20;
 
@@ -1420,15 +1412,13 @@ struct lava_burst_t : public shaman_spell_t
     base_execute_time   -= p -> talents.lightning_mastery * 0.1;
     base_multiplier     *= 1.0 + p -> talents.concussion * 0.01 + p -> talents.call_of_flame * 0.02;
     base_hit            += p -> talents.elemental_precision * 0.01;
-    direct_power_mod    += p -> talents.shamanism * 0.04;
+    direct_power_mod    += p -> talents.shamanism * 0.05;
 
     base_crit_bonus_multiplier *= 1.0 + ( util_t::talent_rank( p -> talents.lava_flows,     3, 0.06, 0.12, 0.24 ) +
                                           util_t::talent_rank( p -> talents.elemental_fury, 5, 0.20 ) +
                                           ( p -> set_bonus.tier7_4pc_caster() ? 0.10 : 0.00 ) );
 
     cooldown -> duration = 8.0;
-
-    if ( p -> set_bonus.tier10_4pc_caster() ) cooldown -> duration -= 1.5;
 
     if ( p -> set_bonus.tier9_4pc_caster() )
     {
@@ -1460,6 +1450,9 @@ struct lava_burst_t : public shaman_spell_t
     {
       if ( p -> set_bonus.tier9_4pc_caster() )
         base_td = direct_dmg * 0.1 / num_ticks;
+
+      if ( p -> set_bonus.tier10_4pc_caster() && p -> active_flame_shock )
+        p -> active_flame_shock -> extend_duration( 2 );
     }
   }
 
@@ -1847,7 +1840,6 @@ struct flame_shock_t : public shaman_spell_t
     
     // T8 2pc not yet changed
     if ( p -> set_bonus.tier8_2pc_caster() ) tick_may_crit = true;
-    if ( p -> set_bonus.tier9_2pc_caster() ) num_ticks += 3;
 
     if ( p -> glyphs.shocking )
     {
@@ -1861,6 +1853,9 @@ struct flame_shock_t : public shaman_spell_t
   virtual void execute()
   {
     shaman_t* p = player -> cast_shaman();
+
+    num_ticks = ( p -> set_bonus.tier9_2pc_caster() ) ? 9 : 6;
+    added_ticks = 0;
     shaman_spell_t::execute();
     p -> buffs_stonebreaker -> trigger();
     p -> buffs_tundra       -> trigger();
@@ -3305,14 +3300,14 @@ void shaman_t::init_actions()
       action_list_str += "/fire_elemental_totem";
       if ( talents.feral_spirit ) action_list_str += "/spirit_wolf";
       action_list_str += "/speed_potion";
-      action_list_str += "/lightning_bolt,maelstrom=5";
+      action_list_str += "/lightning_bolt,if=buff.maelstrom_weapon.stack=5";
 
       if ( talents.stormstrike ) action_list_str += "/stormstrike";
-      action_list_str += "/flame_shock";
+      action_list_str += "/flame_shock,if=!ticking";
       action_list_str += "/earth_shock/magma_totem/fire_nova/lightning_shield";
       if ( talents.lava_lash ) action_list_str += "/lava_lash";
       action_list_str += "/shamanistic_rage,tier10_2pc_melee=1";
-      action_list_str += "/lightning_bolt,maelstrom=4";
+      action_list_str += "/lightning_bolt,if=buff.maelstrom_weapon.stack=4";
     }
     else
     {
@@ -3348,18 +3343,16 @@ void shaman_t::init_actions()
           action_list_str += "/speed_potion";
       }
       if ( talents.elemental_mastery ) action_list_str += "/elemental_mastery";
-      action_list_str += "/flame_shock";
-      if ( level >= 75 ) action_list_str += "/lava_burst,flame_shock=1";
+      action_list_str += "/flame_shock,if=!ticking";
+      if ( level >= 75 ) action_list_str += "/lava_burst,if=(dot.flame_shock.remains-cast_time)>=0";
       action_list_str += "/fire_nova,if=target.adds>2";
       if ( ! talents.totem_of_wrath ) 
       {
 	    action_list_str += "/fire_elemental_totem";
 	    action_list_str += "/searing_totem";
       }
-      if ( ! set_bonus.tier10_2pc_caster() ) {
-          action_list_str += "/chain_lightning,conserve=1";
-          if ( ! set_bonus.tier9_4pc_caster() ) action_list_str += ",clearcasting=1";
-      }
+      if ( ! ( set_bonus.tier9_4pc_caster() || set_bonus.tier10_2pc_caster() ) )
+          action_list_str += "/chain_lightning,if=(!buff.bloodlust.react&(mana_pct-target.health_pct)>5)|target.adds>1";
       action_list_str += "/lightning_bolt";
       if ( talents.thunderstorm ) action_list_str += "/thunderstorm";
     }

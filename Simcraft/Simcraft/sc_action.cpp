@@ -19,7 +19,7 @@ action_t::action_t( int         ty,
                     int         tr,
                     bool        sp ) :
     sim( p->sim ), type( ty ), name_str( n ), player( p ), id( 0 ), school( s ), resource( r ), tree( tr ), result( RESULT_NONE ),
-    dual( false ), special( sp ), binary( false ), channeled( false ), background( false ), sequence( false ),
+    dual( false ), special( sp ), binary( false ), channeled( false ), background( false ), sequence( false ), direct_tick( false ),
     repeating( false ), aoe( false ), harmful( true ), proc( false ), pseudo_pet( false ), auto_cast( false ),
     may_miss( false ), may_resist( false ), may_dodge( false ), may_parry( false ),
     may_glance( false ), may_block( false ), may_crush( false ), may_crit( false ),
@@ -54,6 +54,7 @@ action_t::action_t( int         ty,
     min_health_percentage( 0 ), max_health_percentage( 0 ),
     P400( -1 ), moving( -1 ), vulnerable( 0 ), invulnerable( 0 ), wait_on_ready( -1 ), 
     snapshot_haste( -1.0 ),
+    recast( false ),
     if_expr( NULL ),
     sync_action( 0 ), observer( 0 ), next( 0 )
 {
@@ -263,6 +264,8 @@ void action_t::player_buff()
   {
     player_penetration = p -> composite_spell_penetration();
   }
+
+  player_multiplier = p -> composite_player_multiplier( school );
   
   if ( p -> type != PLAYER_GUARDIAN )
   {
@@ -839,29 +842,29 @@ void action_t::assess_damage( double amount,
     if ( sim -> log )
     {
       log_t::output( sim, "%s %s hits %s for %.0f %s damage (%s)",
-		     player -> name(), name(),
-		     sim -> target -> name(), amount,
-		     util_t::school_type_string( school ),
-		     util_t::result_type_string( result ) );
+                     player -> name(), name(),
+                     sim -> target -> name(), amount,
+                     util_t::school_type_string( school ),
+                     util_t::result_type_string( result ) );
       log_t::damage_event( this, amount, dmg_type );
     }
 
-    action_callback_t::trigger( player -> direct_damage_callbacks, this );
+    action_callback_t::trigger( player -> direct_damage_callbacks[ school ], this );
   }
   else // DMG_OVER_TIME
   {
     if ( sim -> log )
     {
       log_t::output( sim, "%s %s ticks (%d of %d) %s for %.0f %s damage (%s)",
-		     player -> name(), name(),
-		     current_tick, num_ticks,
-		     sim -> target -> name(), amount,
-		     util_t::school_type_string( school ),
-		     util_t::result_type_string( result ) );
+                     player -> name(), name(),
+                     current_tick, num_ticks,
+                     sim -> target -> name(), amount,
+                     util_t::school_type_string( school ),
+                     util_t::result_type_string( result ) );
       log_t::damage_event( this, amount, dmg_type );
     }
 
-    action_callback_t::trigger( player -> tick_damage_callbacks, this );
+    action_callback_t::trigger( player -> tick_damage_callbacks[ school ], this );
   }
 
   if ( aoe && sim -> target -> adds_nearby )
@@ -876,7 +879,7 @@ void action_t::assess_damage( double amount,
 // action_t::additional_damage =============================================
 
 void action_t::additional_damage( double amount,
-				  int    dmg_type )
+                                  int    dmg_type )
 {
   amount /= target_multiplier; // FIXME! Weak lip-service to the fact that the adds probably will not be properly debuffed.
   sim -> target -> assess_damage( amount, school, dmg_type );
@@ -1132,7 +1135,12 @@ bool action_t::ready()
   if ( ( scale_ticks_with_haste() > 0 ) && ( haste_gain_percentage > 0.0 ) && ( ticking ) )
   {
     check_duration = ( ( snapshot_haste / haste() - 1.0 ) * 100.0 ) <= haste_gain_percentage;
-  }  
+  }
+
+  if ( recast )
+  {
+    check_duration = false;
+  }
 
   if ( check_duration )
   {
@@ -1143,10 +1151,10 @@ bool action_t::ready()
       double delta = remains - execute_time();
 
       if ( delta > 3.0 )
-	return false;
+        return false;
 
       if ( delta > 0 && sim -> roll( player -> skill ) )
-	return false;
+        return false;
     }
   }
 
@@ -1364,5 +1372,23 @@ action_expr_t* action_t::create_expression( const std::string& name_str )
   }
 
   return player -> create_expression( this, name_str );
+}
+
+// action_t::ppm_proc_chance ================================================
+
+double action_t::ppm_proc_chance( double PPM ) SC_CONST
+{
+  if ( weapon )
+  {
+    return weapon -> proc_chance_on_swing( PPM, time_to_execute );
+  }
+  else
+  {
+    double time = channeled ? time_to_tick : time_to_execute;
+
+    if ( time == 0 ) time = player -> base_gcd;
+
+    return( PPM * time / 60.0 );
+  }
 }
 

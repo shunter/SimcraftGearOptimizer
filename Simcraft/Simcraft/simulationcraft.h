@@ -86,8 +86,8 @@ struct patch_t
   patch_t() { mask = encode( 3, 3, 0 ); }
 };
 
-#define SC_MAJOR_VERSION "330"
-#define SC_MINOR_VERSION "7"
+#define SC_MAJOR_VERSION "332"
+#define SC_MINOR_VERSION "0"
 
 // Forward Declarations ======================================================
 
@@ -198,6 +198,9 @@ enum proc_type
   PROC_TICK,
   PROC_ATTACK_DIRECT,
   PROC_SPELL_DIRECT,
+  PROC_TICK_DAMAGE,
+  PROC_DIRECT_DAMAGE,
+  PROC_SPELL_CAST,
   PROC_MAX
 };
 
@@ -211,6 +214,13 @@ enum school_type
   SCHOOL_DRAIN,
   SCHOOL_MAX
 };
+
+#define SCHOOL_ATTACK_MASK ( (1 << SCHOOL_BLEED)     | (1 << SCHOOL_PHYSICAL) )
+#define SCHOOL_SPELL_MASK  ( (1 << SCHOOL_ARCANE)    | (1 << SCHOOL_CHAOS)  | \
+                             (1 << SCHOOL_FIRE)      | (1 << SCHOOL_FROST)  | \
+                             (1 << SCHOOL_FROSTFIRE) | (1 << SCHOOL_HOLY)   | \
+                             (1 << SCHOOL_NATURE)    | (1 << SCHOOL_SHADOW) )
+#define SCHOOL_ALL_MASK    (-1)
 
 enum talent_tree_type
 {
@@ -315,6 +325,7 @@ enum meta_gem_type
   META_IMPASSIVE_STARFLARE,
   META_INSIGHTFUL_EARTHSIEGE,
   META_INSIGHTFUL_EARTHSTORM,
+  META_INVIGORATING_EARTHSIEGE,
   META_MYSTICAL_SKYFIRE,
   META_PERSISTENT_EARTHSIEGE,
   META_PERSISTENT_EARTHSHATTER,
@@ -771,11 +782,12 @@ struct buff_t
   double remains();
   bool   remains_gt( double time );
   bool   remains_lt( double time );
+  bool   trigger  ( action_t*, int stacks=1, double value=-1.0 );
   bool   trigger  ( int stacks=1, double value=-1.0, double chance=-1.0 );
   void   increment( int stacks=1, double value=-1.0 );
   void   decrement( int stacks=1, double value=-1.0 );
   virtual void   start    ( int stacks=1, double value=-1.0 );
-  void   refresh  ( int stacks=0, double value=-1.0 );
+          void   refresh  ( int stacks=0, double value=-1.0 );
   virtual void   bump     ( int stacks=1, double value=-1.0 );
   virtual void   override ( int stacks=1, double value=-1.0 );
   virtual bool   may_react( int stacks=1 );
@@ -1378,6 +1390,12 @@ struct player_t
   weapon_t off_hand_weapon;
   weapon_t ranged_weapon;
 
+  // Main, offhand, and ranged attacks
+  attack_t* main_hand_attack;
+  attack_t*  off_hand_attack;
+  attack_t* ranged_attack;
+
+
   // Resources
   double  resource_base   [ RESOURCE_MAX ];
   double  resource_initial[ RESOURCE_MAX ];
@@ -1412,8 +1430,9 @@ struct player_t
   std::vector<action_callback_t*> attack_direct_result_callbacks[ RESULT_MAX ];
   std::vector<action_callback_t*> spell_direct_result_callbacks [ RESULT_MAX ];
   std::vector<action_callback_t*> tick_callbacks;
-  std::vector<action_callback_t*> tick_damage_callbacks;
-  std::vector<action_callback_t*> direct_damage_callbacks;
+  std::vector<action_callback_t*> tick_damage_callbacks         [ SCHOOL_MAX ];
+  std::vector<action_callback_t*> direct_damage_callbacks       [ SCHOOL_MAX ];
+  std::vector<action_callback_t*> spell_cast_result_callbacks   [ RESULT_MAX ];
 
   // Action Priority List
   action_t*   action_list;
@@ -1480,10 +1499,12 @@ struct player_t
     buff_t* blood_fury_sp;
     buff_t* bloodlust;
     buff_t* demonic_pact;
+    buff_t* destruction_potion;
     buff_t* divine_spirit;
     buff_t* focus_magic;
     buff_t* fortitude;
     buff_t* heroic_presence;
+    buff_t* indestructible_potion;
     buff_t* innervate;
     buff_t* mark_of_the_wild;
     buff_t* mongoose_mh;
@@ -1492,9 +1513,12 @@ struct player_t
     buff_t* power_infusion;
     buff_t* hysteria;
     buff_t* replenishment;
+    buff_t* speed_potion;
     buff_t* stoneform;
     buff_t* stunned;
     buff_t* tricks_of_the_trade;
+    buff_t* wild_magic_potion_sp;
+    buff_t* wild_magic_potion_crit;
     buffs_t() { memset( (void*) this, 0x0, sizeof( buffs_t ) ); }
   };
   buffs_t buffs;
@@ -1614,6 +1638,8 @@ struct player_t
   virtual double composite_spell_power_multiplier() SC_CONST { return spell_power_multiplier; }
   virtual double composite_attribute_multiplier( int attr ) SC_CONST;
 
+  virtual double composite_player_multiplier( int school ) SC_CONST;
+
   virtual double strength() SC_CONST;
   virtual double agility() SC_CONST;
   virtual double stamina() SC_CONST;
@@ -1651,8 +1677,9 @@ struct player_t
   virtual void register_attack_direct_result_callback( int result_mask, action_callback_t* );
   virtual void register_spell_direct_result_callback ( int result_mask, action_callback_t* );
   virtual void register_tick_callback                ( action_callback_t* );
-  virtual void register_tick_damage_callback         ( action_callback_t* );
-  virtual void register_direct_damage_callback       ( action_callback_t* );
+  virtual void register_tick_damage_callback         ( int result_mask, action_callback_t* );
+  virtual void register_direct_damage_callback       ( int result_mask, action_callback_t* );
+  virtual void register_spell_cast_result_callback   ( int result_mask, action_callback_t* );
 
   virtual std::vector<talent_translation_t>& get_talent_list();
   virtual bool parse_talent_trees( int talents[] );
@@ -1964,7 +1991,7 @@ struct action_t
   std::string name_str;
   player_t* player;
   int id, school, resource, tree, result;
-  bool dual, special, binary, channeled, background, sequence, repeating, aoe, harmful, proc, pseudo_pet, auto_cast;
+  bool dual, special, binary, channeled, background, sequence, direct_tick, repeating, aoe, harmful, proc, pseudo_pet, auto_cast;
   bool may_miss, may_resist, may_dodge, may_parry, may_glance, may_block, may_crush, may_crit;
   bool tick_may_crit, tick_zero;
   int dot_behavior;
@@ -2010,6 +2037,7 @@ struct action_t
   double min_health_percentage, max_health_percentage;
   int P400, moving, vulnerable, invulnerable, wait_on_ready;
   double snapshot_haste;
+  bool recast;
   std::string if_expr_str;
   action_expr_t* if_expr;
   std::string sync_str;
@@ -2086,6 +2114,8 @@ struct action_t
   virtual double total_td_multiplier() SC_CONST { return total_multiplier() * base_td_multiplier; }
 
   virtual action_expr_t* create_expression( const std::string& name );
+
+  virtual double ppm_proc_chance( double PPM ) SC_CONST;
 };
 
 // Attack ====================================================================

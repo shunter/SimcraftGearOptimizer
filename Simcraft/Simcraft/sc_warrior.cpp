@@ -84,10 +84,6 @@ struct warrior_t : public player_t
   rng_t* rng_tier10_4pc_melee;
   rng_t* rng_unbridled_wrath;
 
-  // Auto-Attack
-  attack_t* main_hand_attack;
-  attack_t*  off_hand_attack;
-
   struct talents_t
   {
     int anticipation;           
@@ -171,6 +167,7 @@ struct warrior_t : public player_t
     int overpower;
     int rending;
     int revenge;
+    int shockwave;
     int whirlwind;
     glyphs_t() { memset( ( void* ) this, 0x0, sizeof( glyphs_t ) ); }
   };
@@ -186,10 +183,6 @@ struct warrior_t : public player_t
     // Cooldowns
     cooldowns_sword_specialization = get_cooldown( "sword_specializaton" );
     cooldowns_shield_slam          = get_cooldown( "shield_slam"         );
-
-    // Auto-Attack
-    main_hand_attack = 0;
-    off_hand_attack  = 0;
   }
 
   // Character Definition
@@ -1005,6 +998,7 @@ struct bladestorm_tick_t : public warrior_attack_t
     background  = true;
     may_crit    = true;
     aoe         = true;
+    direct_tick = true;
   }
   virtual void execute()
   {
@@ -1197,7 +1191,7 @@ struct concussion_blow_t : public warrior_attack_t
 
     may_crit = true;
     base_cost = 15;
-    direct_power_mod  = 0.75;
+    direct_power_mod  = 0.375;
     cooldown -> duration = 30.0;
 
     id = 12809;
@@ -1231,6 +1225,7 @@ struct shockwave_t : public warrior_attack_t
     base_cost = 15;
     direct_power_mod = 0.75;
     cooldown -> duration = 20.0;
+    if ( p -> glyphs.shockwave ) cooldown -> duration -= 3;
 
     id = 46968;
   }
@@ -1261,7 +1256,7 @@ struct devastate_t : public warrior_attack_t
     init_rank( ranks, 47498 );
 
     weapon = &( p -> main_hand_weapon );
-    weapon_multiplier = 1.00;
+    weapon_multiplier = 1.20;
 
     may_crit   = true;
     base_cost -= p -> talents.puncture;
@@ -1362,6 +1357,7 @@ struct shield_bash_t : public warrior_attack_t
 
 // Shield Slam ===============================================================
 
+// TODO: Implement the 3.3.2 diminishing returns.
 struct shield_slam_t : public warrior_attack_t
 {
   int sword_and_board;
@@ -2388,6 +2384,7 @@ void warrior_t::init_glyphs()
     else if ( n == "overpower"     ) glyphs.overpower = 1;
     else if ( n == "rending"       ) glyphs.rending = 1;
     else if ( n == "revenge"       ) glyphs.revenge = 1;
+    else if ( n == "shockwave"     ) glyphs.shockwave = 1;
     else if ( n == "whirlwind"     ) glyphs.whirlwind = 1;
     else if ( n == "blocking"      ) glyphs.blocking = 1;
     // To prevent warnings....

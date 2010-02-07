@@ -99,10 +99,6 @@ struct rogue_t : public player_t
   rng_t* rng_tier10_4pc;
   rng_t* rng_wound_poison;
 
-  // Auto-Attack
-  attack_t* main_hand_attack;
-  attack_t*  off_hand_attack;
-
   // Options
   std::vector<action_callback_t*> critical_strike_callbacks;
   std::vector<double> critical_strike_intervals;
@@ -219,10 +215,6 @@ struct rogue_t : public player_t
     // Cooldowns
     cooldowns_honor_among_thieves = get_cooldown( "honor_among_thieves" );
     cooldowns_seal_fate           = get_cooldown( "seal_fate"           );
-
-    // Auto-Attack
-    main_hand_attack = 0;
-    off_hand_attack  = 0;
 
     // Options
     critical_strike_intervals_str = "1.50/1.75/2.0/2.25";
@@ -873,7 +865,7 @@ void rogue_attack_t::player_buff()
   }
   if ( p -> buffs_hunger_for_blood -> up() )
   {
-    player_multiplier *= 1.10 + p -> glyphs.hunger_for_blood * 0.03;
+    player_multiplier *= 1.05 + p -> glyphs.hunger_for_blood * 0.03;
   }
   if ( p -> buffs_master_of_subtlety -> check() )
   {
@@ -1815,9 +1807,10 @@ struct killing_spree_tick_t : public rogue_attack_t
   {
     rogue_t* p = player -> cast_rogue();
 
-    dual       = true;
-    background = true;
-    may_crit   = true;
+    dual        = true;
+    background  = true;
+    may_crit    = true;
+    direct_tick = true;
     base_dd_min = base_dd_max = 1;
     base_multiplier *= 1.0 + p -> talents.find_weakness * 0.02;
   }
@@ -2488,7 +2481,7 @@ void rogue_poison_t::player_buff()
 
   if ( p -> buffs_hunger_for_blood -> up() )
   {
-    player_multiplier *= 1.10 + p -> glyphs.hunger_for_blood * 0.03;
+    player_multiplier *= 1.05 + p -> glyphs.hunger_for_blood * 0.03;
   }
   if ( p -> buffs_master_of_subtlety -> check() )
   {
@@ -2557,7 +2550,7 @@ struct deadly_poison_t : public rogue_poison_t
     background     = true;
     num_ticks      = 4;
     base_tick_time = 3.0;
-    tick_power_mod = 0.12 / num_ticks;
+    tick_power_mod = 0.12 / num_ticks * 0.9; // * 0.9 for the 10% Hot-Fix nerf on Jan 7th. 2010.
     base_td_init   = util_t::ability_rank( p -> level,  296,80,  244,76,  204,70,  160,62,  96,0  ) / num_ticks;
 
     id = 57972;
@@ -2653,7 +2646,7 @@ struct instant_poison_t : public rogue_poison_t
     trigger_gcd      = 0;
     background       = true;
     may_crit         = true;
-    direct_power_mod = 0.10;
+    direct_power_mod = 0.10 * 0.9; // * 0.9 for the Hot-Fix nerf on Jan. 7th 2010.
     base_dd_min      = util_t::ability_rank( p -> level,  300,79,  245,73,  161,68,  76,0 );
     base_dd_max      = util_t::ability_rank( p -> level,  400,79,  327,73,  215,68,  100,0 );
 
@@ -2699,7 +2692,7 @@ struct wound_poison_t : public rogue_poison_t
     trigger_gcd      = 0;
     background       = true;
     may_crit         = true;
-    direct_power_mod = .04;
+    direct_power_mod = .04 * 0.9; // * 0.9 for the Hot-Fix nerf on Jan. 7th, 2010.
     base_dd_min = base_dd_max = util_t::ability_rank( p -> level,  231,78,  188,72,  112,64,  53,0 );
 
     id = 57978;
