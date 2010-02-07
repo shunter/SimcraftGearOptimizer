@@ -35,7 +35,8 @@ namespace SimcraftGearOptimizer
 
         private string ToSimcraft(string slotSuffix, string gemsStr)
         {
-            var slot = string.Join("_", NameSplitter.Split(Slot.ToString())).ToLowerInvariant();
+            var slotStr = Slot == GearSlot.TwoHand ? GearSlot.MainHand.ToString() : Slot.ToString();
+            var slot = string.Join("_", NameSplitter.Split(slotStr)).ToLowerInvariant();
 
             return string.Format("{0}{1}={2}{3}", slot, slotSuffix, OptionsStr, gemsStr);
         }

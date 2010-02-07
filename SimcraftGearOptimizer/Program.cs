@@ -16,6 +16,13 @@ namespace SimcraftGearOptimizer
         {
             GearDatabase database = GearDatabase.Initialize();
 
+            var twoHandCombinations = from twoHand in database.TwoHand
+                                      select new List<IGearItem> { twoHand };
+            var oneHandOffHandCombinations = from mainHand in database.MainHand
+                                             from offhand in database.OffHand
+                                             select new List<IGearItem> { mainHand, offhand };
+            var weaponCombinations = twoHandCombinations.Union(oneHandOffHandCombinations);
+
             var combinations = (from back in database.Back.AsParallel()
                                 from chest in database.Chest
                                 from feet in database.Feet
@@ -25,9 +32,7 @@ namespace SimcraftGearOptimizer
                                 from hands in database.Hands
                                 from head in database.Head
                                 from legs in database.Legs
-                                from mainHand in database.MainHand
                                 from neck in database.Neck
-                                from offHand in database.OffHand
                                 from ranged in database.Ranged
                                 from shoulders in database.Shoulders
                                 from trinket1 in database.Trinket
@@ -35,7 +40,8 @@ namespace SimcraftGearOptimizer
                                 where trinket1.CompareTo(trinket2) < 0
                                 from waist in database.Waist
                                 from wrists in database.Wrists
-                                select new HashSet<IGemmableGearItem>
+                                from weaponCombo in weaponCombinations
+                                select new HashSet<IGemmableGearItem>(weaponCombo.Select(w => w.MakeGemmable()))
                                 {
                                     back.MakeGemmable(),
                                     chest.MakeGemmable(),
@@ -45,9 +51,7 @@ namespace SimcraftGearOptimizer
                                     hands.MakeGemmable(),
                                     head.MakeGemmable(),
                                     legs.MakeGemmable(),
-                                    mainHand.MakeGemmable(),
                                     neck.MakeGemmable(),
-                                    offHand.MakeGemmable(),
                                     ranged.MakeGemmable(),
                                     shoulders.MakeGemmable(),
                                     trinket1.WithSlotSuffix("1").MakeGemmable(),
@@ -82,12 +86,12 @@ namespace SimcraftGearOptimizer
                             maxDps = dps;
                             highestSet = gearset;
                         }
-                        
+
                         completed++;
                         if (completed % 500 == 0)
                         {
                             var elapsed = sw.Elapsed;
-                            var setsPerSec = completed / (double) elapsed.TotalSeconds;
+                            var setsPerSec = completed / (double)elapsed.TotalSeconds;
                             var eta = TimeSpan.FromSeconds(setCount / setsPerSec);
                             Console.WriteLine("{0} sets completed in {1}, {2} sets/sec, ETA {3}.", completed, elapsed, setsPerSec, eta);
                         }
@@ -102,8 +106,8 @@ namespace SimcraftGearOptimizer
                 {
                     defaults.Add(line);
                 }
-             }
-            
+            }
+
             Action<HashSet<IGemmableGearItem>> a = gearset =>
                 {
                     FillGems(gearset);

@@ -18,6 +18,7 @@ namespace SimcraftGearOptimizer
         Finger = 11,
         Trinket = 12,
         Back = 16,
+        TwoHand = 17,
         Chest = 20,
         MainHand = 21,
         OffHand = 23,

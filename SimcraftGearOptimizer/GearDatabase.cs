@@ -79,6 +79,14 @@ namespace SimcraftGearOptimizer
             }
         }
 
+        public IEnumerable<IGearItem> TwoHand
+        {
+            get
+            {
+                return items[GearSlot.TwoHand];
+            }
+        }
+
         public IEnumerable<IGearItem> Neck
         {
             get
