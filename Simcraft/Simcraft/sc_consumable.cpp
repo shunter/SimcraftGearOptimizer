@@ -130,31 +130,7 @@ struct food_t : public action_t
     player -> food = type;
     switch ( type )
     {
-    case FOOD_TENDER_SHOVELTUSK_STEAK:
-      player -> stat_gain( STAT_SPELL_POWER, 46 );
-      player -> stat_gain( STAT_STAMINA, 40 );
-      break;
-    case FOOD_SNAPPER_EXTREME:
-      player -> stat_gain( STAT_HIT_RATING, 40 );
-      player -> stat_gain( STAT_STAMINA, 40 );
-      break;
-    case FOOD_SMOKED_SALMON:
-      player -> stat_gain( STAT_SPELL_POWER, 35 );
-      player -> stat_gain( STAT_STAMINA, 40 );
-      break;
-    case FOOD_POACHED_BLUEFISH:
-      player -> stat_gain( STAT_SPELL_POWER, 23 );
-      player -> stat_gain( STAT_SPIRIT, 20 );
-      break;
     case FOOD_BLACKENED_BASILISK:
-      player -> stat_gain( STAT_SPELL_POWER, 23 );
-      player -> stat_gain( STAT_SPIRIT, 20 );
-      break;
-    case FOOD_GOLDEN_FISHSTICKS:
-      player -> stat_gain( STAT_SPELL_POWER, 23 );
-      player -> stat_gain( STAT_SPIRIT, 20 );
-      break;
-    case FOOD_CRUNCHY_SERPENT:
       player -> stat_gain( STAT_SPELL_POWER, 23 );
       player -> stat_gain( STAT_SPIRIT, 20 );
       break;
@@ -162,26 +138,60 @@ struct food_t : public action_t
       player -> stat_gain( STAT_AGILITY, 40 );
       player -> stat_gain( STAT_STAMINA, 40 );
       break;
+    case FOOD_CRUNCHY_SERPENT:
+      player -> stat_gain( STAT_SPELL_POWER, 23 );
+      player -> stat_gain( STAT_SPIRIT, 20 );
+      break;
     case FOOD_DRAGONFIN_FILET:
       player -> stat_gain( STAT_STRENGTH, 40 );
       player -> stat_gain( STAT_STAMINA, 40 );
       break;
-    case FOOD_RHINOLICIOUS_WORMSTEAK:
-      player -> stat_gain( STAT_EXPERTISE_RATING, 40 );
+    case FOOD_FISH_FEAST:
+      player -> stat_gain( STAT_ATTACK_POWER, 80 );
+      player -> stat_gain( STAT_SPELL_POWER,  46 );
       player -> stat_gain( STAT_STAMINA, 40 );
       break;
-    case FOOD_HEARTY_RHINO:
-      player -> stat_gain( STAT_ARMOR_PENETRATION_RATING, 40 );
-      player -> stat_gain( STAT_STAMINA, 40 );
+    case FOOD_GOLDEN_FISHSTICKS:
+      player -> stat_gain( STAT_SPELL_POWER, 23 );
+      player -> stat_gain( STAT_SPIRIT, 20 );
       break;
     case FOOD_GREAT_FEAST:
       player -> stat_gain( STAT_ATTACK_POWER, 60 );
       player -> stat_gain( STAT_SPELL_POWER,  35 );
       player -> stat_gain( STAT_STAMINA, 30 );
       break;
-    case FOOD_FISH_FEAST:
+    case FOOD_HEARTY_RHINO:
+      player -> stat_gain( STAT_ARMOR_PENETRATION_RATING, 40 );
+      player -> stat_gain( STAT_STAMINA, 40 );
+      break;
+    case FOOD_IMPERIAL_MANTA_STEAK:
+    case FOOD_VERY_BURNT_WORG:
+      player -> stat_gain( STAT_HASTE_RATING, 40 );
+      player -> stat_gain( STAT_STAMINA, 40 );
+      break;
+    case FOOD_MEGA_MAMMOTH_MEAL:
+    case FOOD_POACHED_NORTHERN_SCULPIN:
       player -> stat_gain( STAT_ATTACK_POWER, 80 );
-      player -> stat_gain( STAT_SPELL_POWER,  46 );
+      player -> stat_gain( STAT_STAMINA, 40 );
+      break;
+    case FOOD_POACHED_BLUEFISH:
+      player -> stat_gain( STAT_SPELL_POWER, 23 );
+      player -> stat_gain( STAT_SPIRIT, 20 );
+      break;
+    case FOOD_RHINOLICIOUS_WORMSTEAK:
+      player -> stat_gain( STAT_EXPERTISE_RATING, 40 );
+      player -> stat_gain( STAT_STAMINA, 40 );
+      break;
+    case FOOD_SMOKED_SALMON:
+      player -> stat_gain( STAT_SPELL_POWER, 35 );
+      player -> stat_gain( STAT_STAMINA, 40 );
+      break;
+    case FOOD_SNAPPER_EXTREME:
+      player -> stat_gain( STAT_HIT_RATING, 40 );
+      player -> stat_gain( STAT_STAMINA, 40 );
+      break;
+    case FOOD_TENDER_SHOVELTUSK_STEAK:
+      player -> stat_gain( STAT_SPELL_POWER, 46 );
       player -> stat_gain( STAT_STAMINA, 40 );
       break;
     default: assert( 0 );
@@ -190,7 +200,7 @@ struct food_t : public action_t
 
   virtual bool ready()
   {
-    return( player -> food        ==  FOOD_NONE );
+    return( player -> food == FOOD_NONE );
   }
 };
 
@@ -371,6 +381,7 @@ struct indestructible_potion_t : public action_t
 
     trigger_gcd = 0;
     harmful = false;
+    cooldown -> duration = 120.0; // Assume the player would not chose to overwrite the buff early.
   }
 
   virtual void execute()
@@ -381,20 +392,22 @@ struct indestructible_potion_t : public action_t
       {
         name = "Indestructible Potion Expiration";
         p -> aura_gain( "Indestructible Potion Buff" );
-	      p -> stat_gain( STAT_ARMOR, 3500 );
+	    p -> stat_gain( STAT_ARMOR, 3500 );
         sim -> add_event( this, 120.0 );
       }
       virtual void execute()
       {
         player_t* p = player;
         p -> aura_loss( "Indestructible Potion Buff" );
-	      p -> stat_loss( STAT_ARMOR, 3500 );
+	    p -> stat_loss( STAT_ARMOR, 3500 );
       }
     };
 
     if ( sim -> log ) log_t::output( sim, "%s uses %s", player -> name(), name() );
     new ( sim ) expiration_t( sim, player );
-    player -> potion_used = 1;
+    // The duration of the buff is long enough to trigger the first one before entering combat.
+    if ( player -> in_combat ) player -> potion_used = 1;
+    update_ready();
   }
 
   virtual bool ready()
@@ -499,6 +512,7 @@ struct health_stone_t : public action_t
   {
     if ( sim -> log ) log_t::output( sim, "%s uses Health Stone", player -> name() );
     player -> resource_gain( RESOURCE_HEALTH, health );
+    update_ready();
   }
 
   virtual bool ready()
@@ -549,6 +563,7 @@ struct dark_rune_t : public action_t
     if ( sim -> log ) log_t::output( sim, "%s uses Dark Rune", player -> name() );
     player -> resource_gain( RESOURCE_MANA,   mana, player -> gains.dark_rune );
     player -> resource_loss( RESOURCE_HEALTH, health );
+    update_ready();
   }
 
   virtual bool ready()
@@ -599,15 +614,15 @@ action_t* consumable_t::create_action( player_t*          p,
                                        const std::string& name,
                                        const std::string& options_str )
 {
-  if ( name == "dark_rune"             ) return new          dark_rune_t( p, options_str );
-  if ( name == "destruction_potion"    ) return new destruction_potion_t( p, options_str );
-  if ( name == "flask"                 ) return new              flask_t( p, options_str );
-  if ( name == "food"                  ) return new               food_t( p, options_str );
-  if ( name == "health_stone"          ) return new       health_stone_t( p, options_str );
-  if ( name == "indestructible_potion" ) return new       speed_potion_t( p, options_str );
-  if ( name == "mana_potion"           ) return new        mana_potion_t( p, options_str );
-  if ( name == "speed_potion"          ) return new       speed_potion_t( p, options_str );
-  if ( name == "wild_magic_potion"     ) return new  wild_magic_potion_t( p, options_str );
+  if ( name == "dark_rune"             ) return new             dark_rune_t( p, options_str );
+  if ( name == "destruction_potion"    ) return new    destruction_potion_t( p, options_str );
+  if ( name == "flask"                 ) return new                 flask_t( p, options_str );
+  if ( name == "food"                  ) return new                  food_t( p, options_str );
+  if ( name == "health_stone"          ) return new          health_stone_t( p, options_str );
+  if ( name == "indestructible_potion" ) return new indestructible_potion_t( p, options_str );
+  if ( name == "mana_potion"           ) return new           mana_potion_t( p, options_str );
+  if ( name == "speed_potion"          ) return new          speed_potion_t( p, options_str );
+  if ( name == "wild_magic_potion"     ) return new     wild_magic_potion_t( p, options_str );
 
   return 0;
 }

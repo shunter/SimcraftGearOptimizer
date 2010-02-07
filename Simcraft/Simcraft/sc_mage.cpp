@@ -1448,7 +1448,6 @@ struct arcane_missiles_t : public mage_spell_t
       if ( ! trigger_tier8_4pc( this ) )
       {
         p -> buffs_missile_barrage -> expire();
-        p -> buffs_tier10_2pc -> trigger();  // FIXME!! Assume the haste proc affects the AM-channel
       }
     }
   }
@@ -1481,6 +1480,7 @@ struct arcane_missiles_t : public mage_spell_t
     mage_t* p = player -> cast_mage();
     mage_spell_t::last_tick();
     p -> buffs_arcane_blast -> expire();
+    if ( base_tick_time == 0.5 ) p -> buffs_tier10_2pc -> trigger();
   }
 
   virtual bool ready()
