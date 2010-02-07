@@ -135,10 +135,6 @@ struct death_knight_t : public player_t
   // Cooldowns
   cooldown_t* cooldowns_howling_blast;
 
-  // Auto-Attack
-  attack_t* main_hand_attack;
-  attack_t*  off_hand_attack;
-
   // Diseases
   spell_t* blood_plague;
   spell_t* frost_fever;
@@ -366,10 +362,6 @@ struct death_knight_t : public player_t
     active_bloodworms          = NULL;
     active_dancing_rune_weapon = NULL;
     active_ghoul               = NULL;
-
-    // Auto-Attack
-    main_hand_attack    = NULL;
-    off_hand_attack     = NULL;
 
     sudden_doom         = NULL;
     blood_plague        = NULL;
@@ -679,9 +671,8 @@ struct gargoyle_pet_t : public pet_t
 
 struct ghoul_pet_t : public pet_t
 {
-  attack_t* main_hand_attack;
   ghoul_pet_t( sim_t* sim, player_t* owner ) :
-      pet_t( sim, owner, "ghoul" ), main_hand_attack( 0 )
+      pet_t( sim, owner, "ghoul" )
   {
     main_hand_weapon.type       = WEAPON_BEAST;
     main_hand_weapon.min_dmg    = 100; // FIXME only level 80 value
@@ -1147,7 +1138,7 @@ static void trigger_ebon_plaguebringer( action_t* a )
   if ( ! p -> talents.ebon_plaguebringer ) return;
 
   double disease_duration = a -> dot -> ready - a -> sim -> current_time;
-  if ( a -> sim -> target -> debuffs.crypt_fever -> remains_lt( disease_duration ) )
+  if ( a -> sim -> target -> debuffs.ebon_plaguebringer -> remains_lt( disease_duration ) )
   {
     double value = util_t::talent_rank( p -> talents.ebon_plaguebringer, 3, 4, 9, 13 );
     a -> sim -> target -> debuffs.ebon_plaguebringer -> duration = disease_duration;
@@ -1170,6 +1161,7 @@ static void trigger_icy_talons( action_t* a )
 // Trigger Necrosis =========================================================
 static void trigger_necrosis( action_t* a )
 {
+  if ( a -> proc ) return;
   death_knight_t* p = a -> player -> cast_death_knight();
 
   if ( ! p -> talents.necrosis )
@@ -2503,15 +2495,13 @@ struct frost_fever_t : public death_knight_spell_t
 // Frost Strike =============================================================
 struct frost_strike_t : public death_knight_attack_t
 {
-  int killing_machine;
   frost_strike_t( player_t* player, const std::string& options_str  ) :
-      death_knight_attack_t( "frost_strike", player, SCHOOL_FROST, TREE_FROST ), killing_machine( 0 )
+      death_knight_attack_t( "frost_strike", player, SCHOOL_FROST, TREE_FROST )
   {
     death_knight_t* p = player -> cast_death_knight();
 
     option_t options[] =
     {
-      { "killing_machine", OPT_INT, &killing_machine },
       { NULL, OPT_UNKNOWN, NULL }
     };
     parse_options( options, options_str );
@@ -2538,15 +2528,6 @@ struct frost_strike_t : public death_knight_attack_t
     base_crit += p -> set_bonus.tier8_2pc_melee() * 0.08;
     base_cost -= p -> glyphs.frost_strike * 8;
     base_dd_adder = 113 * p -> sigils.vengeful_heart;
-  }
-
-  virtual bool ready()
-  {
-    death_knight_t* p = player -> cast_death_knight();
-    if ( killing_machine && ! p -> buffs_killing_machine -> check() )
-      return false;
-
-    return death_knight_attack_t::ready();
   }
 
   virtual void consume_resource() { }
@@ -2705,17 +2686,14 @@ struct horn_of_winter_t : public death_knight_spell_t
 // Howling Blast ============================================================
 struct howling_blast_t : public death_knight_spell_t
 {
-  int killing_machine, rime;
   howling_blast_t( player_t* player, const std::string& options_str ) :
-      death_knight_spell_t( "howling_blast", player, SCHOOL_FROST, TREE_FROST ), killing_machine( 0 ), rime( 0 )
+      death_knight_spell_t( "howling_blast", player, SCHOOL_FROST, TREE_FROST )
   {
 
     death_knight_t* p = player -> cast_death_knight();
     check_talent( p -> talents.howling_blast );
     option_t options[] =
     {
-      { "killing_machine", OPT_INT, &killing_machine },
-      { "rime",            OPT_INT, &rime            },
       { NULL, OPT_UNKNOWN, NULL }
     };
     parse_options( options, options_str );
@@ -2766,6 +2744,7 @@ struct howling_blast_t : public death_knight_spell_t
           p -> frost_fever = new frost_fever_t( p );
 
         p -> frost_fever -> execute();
+        trigger_icy_talons( this );
       }
       p -> resource_gain( RESOURCE_RUNIC, 2.5 * p -> talents.chill_of_the_grave, p -> gains_chill_of_the_grave );
     }
@@ -2793,9 +2772,6 @@ struct howling_blast_t : public death_knight_spell_t
   {
     death_knight_t* p = player -> cast_death_knight();
 
-    if ( killing_machine && ! p -> buffs_killing_machine -> check() )
-      return false;
-
     if ( p -> buffs_rime -> check() )
     {
       // If Rime is up, runes are no restriction.
@@ -2805,10 +2781,6 @@ struct howling_blast_t : public death_knight_spell_t
       cost_unholy = 1;
       cost_frost  = 1;
       return rime_ready;
-    }
-    else if ( rime )
-    {
-      return false;
     }
     return death_knight_spell_t::ready();
   }
@@ -2863,14 +2835,12 @@ struct hysteria_t : public action_t
 // Icy Touch ================================================================
 struct icy_touch_t : public death_knight_spell_t
 {
-  int killing_machine;
   icy_touch_t( player_t* player, const std::string& options_str ) :
-      death_knight_spell_t( "icy_touch", player, SCHOOL_FROST, TREE_FROST ), killing_machine( 0 )
+      death_knight_spell_t( "icy_touch", player, SCHOOL_FROST, TREE_FROST )
   {
     death_knight_t* p = player -> cast_death_knight();
     option_t options[] =
     {
-      { "killing_machine", OPT_INT, &killing_machine },
       { NULL, OPT_UNKNOWN, NULL }
     };
     parse_options( options, options_str );
@@ -2893,15 +2863,6 @@ struct icy_touch_t : public death_knight_spell_t
     cooldown -> duration          = 0.0;
 
     base_crit += p -> talents.rime * 0.05;
-  }
-
-  virtual bool ready()
-  {
-    death_knight_t* p = player -> cast_death_knight();
-    if ( killing_machine && ! p -> buffs_killing_machine -> check() )
-      return false;
-
-    return death_knight_spell_t::ready();
   }
 
   virtual void execute()
@@ -3081,11 +3042,11 @@ struct pestilence_t : public death_knight_spell_t
       p -> procs_glyph_of_disease -> occur();
       if ( p -> dots_blood_plague -> ticking() )
       {
-        p -> blood_plague -> execute();
+        p -> blood_plague -> refresh_duration();
       }
       if ( p -> dots_frost_fever -> ticking() )
       {
-        p -> frost_fever -> execute();
+        p -> frost_fever -> refresh_duration();
       }
     }
   }
@@ -3322,8 +3283,7 @@ struct scourge_strike_t : public death_knight_attack_t
   {
     scourge_strike_shadow_t( player_t* player ) : death_knight_attack_t( "scourge_strike_shadow", player, SCHOOL_SHADOW, TREE_UNHOLY )
     {
-      death_knight_t* p = player -> cast_death_knight();
-
+      weapon = &( player -> main_hand_weapon );
       may_miss = may_parry = may_dodge = false;
       may_crit    = false;
       proc        = true;
@@ -3339,10 +3299,6 @@ struct scourge_strike_t : public death_knight_attack_t
 
       base_attack_power_multiplier = 0;
       base_dd_min = base_dd_max    = 0.1;
-
-      base_crit += p -> talents.subversion * 0.03;
-      base_crit += p -> talents.vicious_strikes * 0.03;
-      base_crit_bonus_multiplier *= 1.0 + ( p -> talents.vicious_strikes * 0.15 );
     }
 
     virtual void target_debuff( int dmg_type )
@@ -3386,7 +3342,6 @@ struct scourge_strike_t : public death_knight_attack_t
     cost_frost = 1;
     cost_unholy = 1;
 
-
     base_crit += p -> talents.subversion * 0.03;
     base_crit += p -> talents.vicious_strikes * 0.03;
     base_crit_bonus_multiplier *= 1.0 + ( p -> talents.vicious_strikes * 0.15 );
@@ -3395,7 +3350,6 @@ struct scourge_strike_t : public death_knight_attack_t
 
     if ( p -> sigils.awareness )
       base_dd_adder = 420;
-
   }
 
   void execute()

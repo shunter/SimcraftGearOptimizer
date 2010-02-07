@@ -579,7 +579,7 @@ struct imp_pet_t : public warlock_pet_t
 
       base_execute_time -= 0.25 * ( o -> talents.improved_fire_bolt + o -> talents.demonic_power );
 
-      base_multiplier *= 1.0 + ( o -> talents.empowered_imp * 0.05 + // o -> talents.improved_imp moved up
+      base_multiplier *= 1.0 + ( o -> talents.empowered_imp * 0.10 + // o -> talents.improved_imp moved up
                                  o -> glyphs.imp            * 0.20 );
 
       base_crit_bonus_multiplier *= 1.0 + o -> talents.ruin * 0.20;
@@ -1181,7 +1181,7 @@ void warlock_spell_t::player_buff()
     player_multiplier *= 1.20;
   }
 
-  player_multiplier *= 1.0 + ( p -> talents.demonic_pact * 0.01 );
+  player_multiplier *= 1.0 + ( p -> talents.demonic_pact * 0.02 );
 
   if ( p -> buffs_tier10_4pc_caster -> up() )
   {
@@ -1622,7 +1622,7 @@ struct shadow_bolt_t : public warlock_spell_t
 
     base_multiplier *= 1.0 + ( p -> talents.shadow_mastery       * 0.03 +
                                p -> set_bonus.tier6_4pc_caster() * 0.06 +
-                               p -> talents.improved_shadow_bolt * 0.01 );
+                               p -> talents.improved_shadow_bolt * 0.02 );
 
     base_crit += ( p -> talents.devastation           * 0.05 +
                                p -> set_bonus.tier8_4pc_caster()  * 0.05 +
@@ -1927,13 +1927,16 @@ struct shadowfury_t : public warlock_spell_t
 
 struct corruption_t : public warlock_spell_t
 {
+  int tier10_4pc;
+  bool tier10_4pc_effect;
   corruption_t( player_t* player, const std::string& options_str ) :
-      warlock_spell_t( "corruption", player, SCHOOL_SHADOW, TREE_AFFLICTION )
+      warlock_spell_t( "corruption", player, SCHOOL_SHADOW, TREE_AFFLICTION ), tier10_4pc( 0 ), tier10_4pc_effect( false )
   {
     warlock_t* p = player -> cast_warlock();
 
     option_t options[] =
     {
+      { "tier10_4pc",    OPT_BOOL,  &tier10_4pc   },
       { NULL, OPT_UNKNOWN, NULL }
     };
     parse_options( options, options_str );
@@ -1977,7 +1980,11 @@ struct corruption_t : public warlock_spell_t
   {
     base_td = base_td_init;
     warlock_spell_t::execute();
-    if ( result_is_hit() ) num_ticks = 6;
+    if ( result_is_hit() ) {
+      warlock_t* p = player -> cast_warlock();
+      tier10_4pc_effect = p -> buffs_tier10_4pc_caster -> up();
+      num_ticks = 6;
+    }
   }
 
   virtual int scale_ticks_with_haste() SC_CONST
@@ -2000,6 +2007,22 @@ struct corruption_t : public warlock_spell_t
     p -> buffs_tier7_2pc_caster -> trigger();
     if ( p -> set_bonus.tier6_2pc_caster() ) p -> resource_gain( RESOURCE_HEALTH, 70 );
     trigger_molten_core( this );
+  }
+
+  virtual bool ready()
+  {
+    if ( tier10_4pc )
+    {
+      warlock_t* p = player -> cast_warlock();
+      if ( ! tier10_4pc_effect && p -> buffs_tier10_4pc_caster -> up() )
+      {
+        recast = true;
+        bool ret = warlock_spell_t::ready();
+        recast = false;
+        return ret;
+      }
+    }
+    return warlock_spell_t::ready();
   }
 };
 
@@ -2448,8 +2471,8 @@ struct shadowflame_t : public warlock_spell_t
     may_crit          = true;
     base_tick_time    = 2.0;
     num_ticks         = 4;
-    direct_power_mod  = 0.1429;
-    tick_power_mod    = 0.28;
+    direct_power_mod  = 0.106667;
+    tick_power_mod    = 0.066667 ;
 
     cooldown -> duration = 15.0;
 
@@ -2550,6 +2573,9 @@ struct conflagrate_t : public warlock_spell_t
     }
 
     tick_dmg /= 3;
+
+    // 3.3.2 buff
+    tick_dmg *= 2.0;
 
     return tick_dmg;
   }
@@ -3765,7 +3791,7 @@ void warlock_t::init_buffs()
   buffs_metamorphosis       = new buff_t( this, "metamorphosis",       1, 30.0 + glyphs.metamorphosis * 6.0, 0.0, talents.metamorphosis );
   buffs_molten_core         = new buff_t( this, "molten_core",         3, 15.0, 0.0, talents.molten_core * 0.04 );
   buffs_pyroclasm           = new buff_t( this, "pyroclasm",           1, 10.0, 0.0, talents.pyroclasm );
-  buffs_shadow_embrace      = new buff_t( this, "shadow_embrace",      2, 12.0, 0.0, talents.shadow_embrace );
+  buffs_shadow_embrace      = new buff_t( this, "shadow_embrace",      3, 12.0, 0.0, talents.shadow_embrace );
   buffs_shadow_trance       = new buff_t( this, "shadow_trance",       1,  0.0, 0.0, talents.nightfall );
   buffs_tier10_4pc_caster   = new buff_t( this, "tier10_4pc_caster",   1, 10.0, 0.0, 0.15 ); // Fix-Me: Might need to add an ICD.
 
@@ -3813,6 +3839,7 @@ void warlock_t::init_actions()
 {
   if ( action_list_str.empty() )
   {
+    std::string tap_str = ( talents.dark_pact ) ? "dark_pact" : "life_tap";
     action_list_str += "flask,type=frost_wyrm/food,type=fish_feast";
     action_list_str += ( talents.master_conjuror || talents.haunt ) ? "/spell_stone" : "/fire_stone";
     action_list_str += "/fel_armor/summon_pet";
@@ -3831,7 +3858,7 @@ void warlock_t::init_actions()
     action_list_str += "/snapshot_stats";
     if( set_bonus.tier7_4pc_caster() || glyphs.life_tap )
     {
-      action_list_str+="/life_tap,buff_refresh=1";
+      action_list_str+="/" + tap_str + ",buff_refresh=1";
     }
     int num_items = ( int ) items.size();
     for ( int i=0; i < num_items; i++ )
@@ -3853,10 +3880,9 @@ void warlock_t::init_actions()
     action_list_str += "/wild_magic_potion,bloodlust=1";
     if ( talents.haunt || talents.unstable_affliction ) // 41+_xx_xx
     {
-      if ( talents.haunt ) action_list_str += "/haunt,debuff=1";
+      if ( talents.haunt ) action_list_str += "/haunt";
       action_list_str += "/corruption/curse_of_agony";
       if ( talents.unstable_affliction ) action_list_str += "/unstable_affliction";
-      if ( talents.haunt ) action_list_str += "/haunt";
       if ( talents.soul_siphon ) action_list_str += "/drain_soul,health_percentage<=25,interrupt=1";
     }
     else if ( talents.chaos_bolt ) // 00_13_58
@@ -3864,7 +3890,8 @@ void warlock_t::init_actions()
       if ( talents.conflagrate ) action_list_str += "/conflagrate";
       action_list_str += "/immolate";
       action_list_str += "/chaos_bolt";
-      action_list_str += "/curse_of_doom,time_to_die>=80";
+      action_list_str += "/curse_of_doom,time_to_die>=90";
+      action_list_str += "/curse_of_agony,time_to_die>=28,moving=1";
     }
     else if ( talents.metamorphosis ) // 00_56_15
     {
@@ -3902,13 +3929,11 @@ void warlock_t::init_actions()
     action_list_str += talents.emberstorm ? "/incinerate" : "/shadow_bolt";
 
     // instants to use when moving if possible
-    action_list_str += "/life_tap,mana_percentage<=20,buff_refresh=1,moving=1";
-    action_list_str += "/corruption,time_to_die>=20,moving=1";
-    action_list_str += "/curse_of_agony,time_to_die>=30,moving=1";
+    action_list_str += "/" + tap_str + ",mana_percentage<=20,buff_refresh=1,moving=1";
     if ( talents.shadow_burn ) action_list_str += "/shadow_burn,moving=1";
     if ( talents.shadowfury  ) action_list_str += "/shadowfury,moving=1";
 
-    action_list_str += "/life_tap"; // to use when no mana or nothing else is possible
+    action_list_str += "/" + tap_str; // to use when no mana or nothing else is possible
 
     action_list_default = 1;
   }

@@ -273,19 +273,19 @@ bool item_t::decode_stats()
     {
       if ( s == STAT_ARMOR )
       {
-	if ( slot != SLOT_HEAD      &&
-	     slot != SLOT_SHOULDERS &&
-	     slot != SLOT_CHEST     &&
-	     slot != SLOT_WAIST     &&
-	     slot != SLOT_LEGS      &&
-	     slot != SLOT_FEET      &&
-	     slot != SLOT_WRISTS    &&
-	     slot != SLOT_HANDS     &&
-	     slot != SLOT_BACK      &&
-	     slot != SLOT_OFF_HAND )
-	{
-	  s = STAT_BONUS_ARMOR;
-	}
+        if ( slot != SLOT_HEAD      &&
+             slot != SLOT_SHOULDERS &&
+             slot != SLOT_CHEST     &&
+             slot != SLOT_WAIST     &&
+             slot != SLOT_LEGS      &&
+             slot != SLOT_FEET      &&
+             slot != SLOT_WRISTS    &&
+             slot != SLOT_HANDS     &&
+             slot != SLOT_BACK      &&
+             slot != SLOT_OFF_HAND )
+        {
+          s = STAT_BONUS_ARMOR;
+        }
       }
       stats.add_stat( s, t.value );
     }
@@ -451,6 +451,10 @@ bool item_t::decode_special( special_effect_t& effect,
     {
       effect.proc_chance = t.value / 100.0;
     }
+    else if ( t.name == "ppm" )
+    {
+      effect.proc_chance = -( t.value );
+    }
     else if ( t.name == "duration" || t.name == "dur" )
     {
       effect.duration = t.value;
@@ -471,6 +475,121 @@ bool item_t::decode_special( special_effect_t& effect,
     {
       effect.trigger_str  = t.full;
       effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = SCHOOL_ALL_MASK;
+    }
+    else if ( t.full == "ontickdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_TICK_DAMAGE;
+      effect.trigger_mask = SCHOOL_ALL_MASK;
+    }
+    else if ( t.full == "ondirectdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DIRECT_DAMAGE;
+      effect.trigger_mask = SCHOOL_ALL_MASK;
+    }
+    else if ( t.full == "onspelldamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = SCHOOL_SPELL_MASK;
+    }
+    else if ( t.full == "onspelltickdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_TICK_DAMAGE;
+      effect.trigger_mask = SCHOOL_SPELL_MASK;
+    }
+    else if ( t.full == "onspelldirectdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DIRECT_DAMAGE;
+      effect.trigger_mask = SCHOOL_SPELL_MASK;
+    }
+    else if ( t.full == "onattackdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = SCHOOL_ATTACK_MASK;
+    }
+    else if ( t.full == "onattacktickdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_TICK_DAMAGE;
+      effect.trigger_mask = SCHOOL_ATTACK_MASK;
+    }
+    else if ( t.full == "onattackdirectdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DIRECT_DAMAGE;
+      effect.trigger_mask = SCHOOL_ATTACK_MASK;
+    }
+    else if ( t.full == "onarcanedamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_ARCANE);
+    }
+    else if ( t.full == "onbleeddamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_BLEED);
+    }
+    else if ( t.full == "onchaosdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_CHAOS);
+    }
+    else if ( t.full == "onfiredamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_FIRE);
+    }
+    else if ( t.full == "onfrostdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_FROST);
+    }
+    else if ( t.full == "onfrostfiredamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_FROSTFIRE);
+    }
+    else if ( t.full == "onholydamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_HOLY);
+    }
+    else if ( t.full == "onnaturedamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_NATURE);
+    }
+    else if ( t.full == "onphysicaldamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_PHYSICAL);
+    }
+    else if ( t.full == "onshadowdamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_SHADOW);
+    }
+    else if ( t.full == "ondraindamage" )
+    {
+      effect.trigger_str  = t.full;
+      effect.trigger_type = PROC_DAMAGE;
+      effect.trigger_mask = (1 << SCHOOL_DRAIN);
     }
     else if ( t.full == "ontick" )
     {
@@ -480,8 +599,26 @@ bool item_t::decode_special( special_effect_t& effect,
     else if ( t.full == "onspellcast" )
     {
       effect.trigger_str = t.full;
-      effect.trigger_type = PROC_SPELL;
+      effect.trigger_type = PROC_SPELL_CAST;
       effect.trigger_mask = RESULT_ALL_MASK;
+    }
+    else if ( t.full == "onspellcasthit" )
+    {
+      effect.trigger_str = t.full;
+      effect.trigger_type = PROC_SPELL_CAST;
+      effect.trigger_mask = RESULT_HIT_MASK;
+    }
+    else if ( t.full == "onspellcastcrit" )
+    {
+      effect.trigger_str = t.full;
+      effect.trigger_type = PROC_SPELL_CAST;
+      effect.trigger_mask = RESULT_CRIT_MASK;
+    }
+    else if ( t.full == "onspellcastmiss" )
+    {
+      effect.trigger_str = t.full;
+      effect.trigger_type = PROC_SPELL_CAST;
+      effect.trigger_mask = RESULT_MISS_MASK;
     }
     else if ( t.full == "onspellhit" )
     {
@@ -686,8 +823,8 @@ bool item_t::download_slot( item_t& item, const std::string& item_id, const std:
   if ( ! success )
   {
     util_t::fprintf( item.sim -> output_file,
-		     "\nsimulationcraft: Player %s unable to download slot '%s' info from wowhead.  Trying mmo-champion....\n", 
-		     p -> name(), item.slot_name() );
+                     "\nsimulationcraft: Player %s unable to download slot '%s' info from wowhead.  Trying mmo-champion....\n", 
+                     p -> name(), item.slot_name() );
 
     success = mmo_champion_t::download_slot( item, item_id, enchant_id, gem_ids, 0 );
   }
@@ -695,8 +832,8 @@ bool item_t::download_slot( item_t& item, const std::string& item_id, const std:
   if ( ! success )
   {
     util_t::fprintf( item.sim -> output_file, 
-		     "\nsimulationcraft: Player %s unable to download slot '%s' info from mmo-champion.  Trying wowarmory....\n", 
-		     p -> name(), item.slot_name() );
+                     "\nsimulationcraft: Player %s unable to download slot '%s' info from mmo-champion.  Trying wowarmory....\n", 
+                     p -> name(), item.slot_name() );
 
     success = armory_t::download_slot( item, item_id, 0 );
   }
@@ -723,16 +860,16 @@ bool item_t::download_item( item_t& item, const std::string& item_id )
   if ( ! success )
   {
     util_t::fprintf( item.sim -> output_file,
-		     "\nsimulationcraft: Player %s unable to download item '%s' info from mmo-champion.  Trying wowhead....\n", 
-		     p -> name(), item.name() );
+                     "\nsimulationcraft: Player %s unable to download item '%s' info from mmo-champion.  Trying wowhead....\n", 
+                     p -> name(), item.name() );
 
     success = wowhead_t::download_item( item, item_id, 0 );
   }
   if ( ! success )
   {
     util_t::fprintf( item.sim -> output_file, 
-		     "\nsimulationcraft: Player %s unable to download item '%s' info from mmo-champion.  Trying wowarmory....\n", 
-		     p -> name(), item.name() );
+                     "\nsimulationcraft: Player %s unable to download item '%s' info from mmo-champion.  Trying wowarmory....\n", 
+                     p -> name(), item.name() );
 
     success = armory_t::download_item( item, item_id, 0 );
   }
@@ -757,8 +894,8 @@ bool item_t::download_glyph( sim_t* sim, std::string& glyph_name, const std::str
   if ( ! success )
   {
     util_t::fprintf( sim -> output_file,
-		     "\nsimulationcraft: Unable to download glyph id '%s' info from wowhead.  Trying mmo-champion....\n", 
-		     glyph_id.c_str() );
+                     "\nsimulationcraft: Unable to download glyph id '%s' info from wowhead.  Trying mmo-champion....\n", 
+                     glyph_id.c_str() );
 
     success = mmo_champion_t::download_glyph( sim, glyph_name, glyph_id, 0 );
   }
@@ -791,8 +928,8 @@ int item_t::parse_gem( item_t&            item,
     return gem_type;
 
   util_t::fprintf( item.sim -> output_file,
-		   "\nsimulationcraft: Unable to download gem id '%s' info from wowhead.  Trying mmo-champion....\n", 
-		   gem_id.c_str() );
+                   "\nsimulationcraft: Unable to download gem id '%s' info from wowhead.  Trying mmo-champion....\n", 
+                   gem_id.c_str() );
 
   gem_type = mmo_champion_t::parse_gem( item, gem_id, 0 );
 

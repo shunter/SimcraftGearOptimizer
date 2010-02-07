@@ -82,7 +82,6 @@ struct druid_t : public player_t
   // Random Number Generation
   rng_t* rng_primal_fury;
 
-  attack_t* melee_attack;
   attack_t* cat_melee_attack;
   attack_t* bear_melee_attack;
 
@@ -177,11 +176,13 @@ struct druid_t : public player_t
     int insect_swarm;
     int mangle;
     int moonfire;
+    int monsoon;
     int rip;
     int savage_roar;
     int shred;
     int starfire;
     int starfall;
+    int typhoon;
     glyphs_t() { memset( ( void* ) this, 0x0, sizeof( glyphs_t ) ); }
   };
   glyphs_t glyphs;
@@ -219,7 +220,6 @@ struct druid_t : public player_t
     dots_insect_swarm = get_dot( "insect_swarm" );
     dots_moonfire     = get_dot( "moonfire" );
 
-    melee_attack = 0;
     cat_melee_attack = 0;
     bear_melee_attack = 0;
 
@@ -2182,7 +2182,7 @@ void druid_spell_t::player_buff()
   if ( school == SCHOOL_ARCANE || school == SCHOOL_NATURE )
     player_multiplier *= 1.0 + p -> buffs_t10_2pc_caster -> value();
 
-  player_multiplier *= 1.0 + p -> talents.earth_and_moon * 0.01;
+  player_multiplier *= 1.0 + p -> talents.earth_and_moon * 0.02;
 }
 
 // druid_spell_t::target_debuff ============================================
@@ -2211,16 +2211,16 @@ struct auto_attack_t : public action_t
   virtual void execute()
   {
     druid_t* p = player -> cast_druid();
-    p -> melee_attack -> weapon = &( p -> main_hand_weapon );
-    p -> melee_attack -> base_execute_time = p -> main_hand_weapon.swing_time;
-    p -> melee_attack -> schedule_execute();
+    p -> main_hand_attack -> weapon = &( p -> main_hand_weapon );
+    p -> main_hand_attack -> base_execute_time = p -> main_hand_weapon.swing_time;
+    p -> main_hand_attack -> schedule_execute();
   }
 
   virtual bool ready()
   {
     druid_t* p = player -> cast_druid();
     if ( p -> buffs.moving -> check() ) return false;
-    return( p -> melee_attack -> execute_event == 0 ); // not swinging
+    return( p -> main_hand_attack -> execute_event == 0 ); // not swinging
   }
 };
 
@@ -2529,9 +2529,11 @@ struct insect_swarm_t : public druid_spell_t
 struct moonfire_t : public druid_spell_t
 {
   double min_eclipse_left;
+  double base_crit_tick, base_crit_direct;
 
   moonfire_t( player_t* player, const std::string& options_str ) :
-      druid_spell_t( "moonfire", player, SCHOOL_ARCANE, TREE_BALANCE ), min_eclipse_left( 0 )
+      druid_spell_t( "moonfire", player, SCHOOL_ARCANE, TREE_BALANCE ), min_eclipse_left( 0 ),
+      base_crit_tick( 0 ), base_crit_direct( 0 )
   {
     druid_t* p = player -> cast_druid();
 
@@ -2562,7 +2564,7 @@ struct moonfire_t : public druid_spell_t
     tick_may_crit     = ( p -> set_bonus.tier9_2pc_caster() != 0 );
 
     base_cost *= 1.0 - util_t::talent_rank( p -> talents.moonglow,    3, 0.03 );
-    base_crit += util_t::talent_rank( p -> talents.improved_moonfire, 2, 0.05 );
+    base_crit = util_t::talent_rank( p -> talents.improved_moonfire, 2, 0.05 );
 
     base_crit_bonus_multiplier *= 1.0 + util_t::talent_rank( p -> talents.vengeance, 5, 0.20 );
 
@@ -2585,9 +2587,11 @@ struct moonfire_t : public druid_spell_t
   virtual void execute()
   {
     druid_t* p = player -> cast_druid();
-
+    
+    base_crit = util_t::talent_rank( p -> talents.improved_moonfire, 2, 0.05 );
     druid_spell_t::execute();
-
+    base_crit = 0;
+    
     if ( result_is_hit() )
     {
       num_ticks = 4;
@@ -2664,10 +2668,10 @@ struct bear_form_t : public druid_spell_t
     }
 
     // Force melee swing to restart if necessary
-    if ( p -> melee_attack ) p -> melee_attack -> cancel(); 
+    if ( p -> main_hand_attack ) p -> main_hand_attack -> cancel(); 
 
-    p -> melee_attack = p -> bear_melee_attack;
-    p -> melee_attack -> weapon = w;
+    p -> main_hand_attack = p -> bear_melee_attack;
+    p -> main_hand_attack -> weapon = w;
     
     if ( p -> buffs_cat_form     -> check() ) p -> buffs_cat_form     -> expire();
     if ( p -> buffs_moonkin_form -> check() ) p -> buffs_moonkin_form -> expire();
@@ -2726,10 +2730,10 @@ struct cat_form_t : public druid_spell_t
     }
 
     // Force melee swing to restart if necessary
-    if ( p -> melee_attack ) p -> melee_attack -> cancel(); 
+    if ( p -> main_hand_attack ) p -> main_hand_attack -> cancel(); 
 
-    p -> melee_attack = p -> cat_melee_attack;
-    p -> melee_attack -> weapon = w;
+    p -> main_hand_attack = p -> cat_melee_attack;
+    p -> main_hand_attack -> weapon = w;
 
     if ( p -> buffs_bear_form    -> check() ) p -> buffs_bear_form    -> expire();
     if ( p -> buffs_moonkin_form -> check() ) p -> buffs_moonkin_form -> expire();
@@ -3195,6 +3199,7 @@ struct starfall_t : public druid_spell_t
         base_crit_bonus_multiplier *= 1.0 + util_t::talent_rank( p -> talents.vengeance, 5, 0.20 );
         if ( p -> glyphs.focus )
           base_multiplier *= 1.2;
+        id = 53190;
       }
       virtual void execute()
       {
@@ -3228,7 +3233,7 @@ struct starfall_t : public druid_spell_t
 
         starfall_star_splash = new starfall_star_splash_t( p );
 
-        id = 53201;
+        id = 53195;
       }
 
       virtual void execute()
@@ -3286,6 +3291,45 @@ struct starfall_t : public druid_spell_t
     if ( sim -> debug ) log_t::output( sim, "%s ticks (%d of %d)", name(), current_tick, num_ticks );
     starfall_star -> execute();
     update_time( DMG_OVER_TIME );
+  }
+};
+
+// Typhoon Spell ============================================================
+
+struct typhoon_t : public druid_spell_t
+{
+  typhoon_t( player_t* player, const std::string& options_str ) :
+      druid_spell_t( "typhoon", player, SCHOOL_NATURE, TREE_BALANCE )
+  {
+    druid_t* p = player -> cast_druid();
+    check_talent( p -> talents.typhoon );
+    option_t options[] =
+    {
+      { NULL, OPT_UNKNOWN, NULL }
+    };
+    parse_options( options, options_str );
+
+    static rank_t ranks[] =
+    {
+      { 80, 5, 1190, 1190, 0, 0.32 },
+      { 75, 4, 1010, 1010, 0, 0.32 },
+      { 70, 3,  735,  735, 0, 0.32 },
+      { 60, 2,  550,  550, 0, 0.32 },
+      { 50, 1,  400,  400, 0, 0.32 },
+      {  0, 0,    0,    0, 0, 0 }
+    };
+    init_rank( ranks );
+    
+    base_execute_time = 0;
+    direct_power_mod  = 0.193;
+    base_multiplier *= 1.0 + 0.15 * p -> talents.gale_winds;
+    aoe = true;
+
+    cooldown -> duration = 20;
+    if ( p -> glyphs.monsoon )
+      cooldown -> duration -= 3;
+    if ( p -> glyphs.typhoon )
+      base_cost *= 0.92;
   }
 };
 
@@ -3422,6 +3466,7 @@ action_t* druid_t::create_action( const std::string& name,
   if ( name == "swipe_bear"        ) return new        swipe_bear_t( this, options_str );
   if ( name == "tigers_fury"       ) return new       tigers_fury_t( this, options_str );
   if ( name == "treants"           ) return new     treants_spell_t( this, options_str );
+  if ( name == "typhoon"           ) return new           typhoon_t( this, options_str );
   if ( name == "wrath"             ) return new             wrath_t( this, options_str );
 #if 0
   if ( name == "cower"             ) return new             cower_t( this, options_str );
@@ -3482,11 +3527,13 @@ void druid_t::init_glyphs()
     else if ( n == "insect_swarm" ) glyphs.insect_swarm = 1;
     else if ( n == "mangle"       ) glyphs.mangle = 1;
     else if ( n == "moonfire"     ) glyphs.moonfire = 1;
+    else if ( n == "monsoon"      ) glyphs.monsoon = 1;
     else if ( n == "rip"          ) glyphs.rip = 1;
     else if ( n == "savage_roar"  ) glyphs.savage_roar = 1;
     else if ( n == "shred"        ) glyphs.shred = 1;
     else if ( n == "starfire"     ) glyphs.starfire = 1;
     else if ( n == "starfall"     ) glyphs.starfall = 1;
+    else if ( n == "typhoon"      ) glyphs.typhoon = 1;
     // minor glyphs, to prevent 'not-found' warning
     else if ( n == "aquatic_form"          ) ;
     else if ( n == "barkskin"              ) ;
@@ -3499,8 +3546,8 @@ void druid_t::init_glyphs()
     else if ( n == "hurricane"             ) ;
     else if ( n == "lifebloom"             ) ;
     else if ( n == "maul"                  ) ;
-    else if ( n == "monsoon"               ) ;
     else if ( n == "nourish"               ) ;
+    else if ( n == "rapid_rejuvenation"    ) ;
     else if ( n == "rebirth"               ) ;
     else if ( n == "rejuvenation"          ) ;
     else if ( n == "regrowth"              ) ;
@@ -3508,7 +3555,6 @@ void druid_t::init_glyphs()
     else if ( n == "swiftmend"             ) ;
     else if ( n == "the_wild"              ) ;
     else if ( n == "thorns"                ) ;
-    else if ( n == "typhoon"               ) ;
     else if ( n == "unburdened_rebirth"    ) ;
     else if ( n == "wild_growth"           ) ;
     else if ( n == "wrath"                 ) ;
@@ -3809,6 +3855,7 @@ void druid_t::init_actions()
       if ( talents.moonkin_form ) action_list_str += "/moonkin_form";
       action_list_str += "/snapshot_stats";
       if ( talents.improved_faerie_fire ) action_list_str += "/faerie_fire";
+      action_list_str += "/typhoon,moving=1";
       action_list_str += "/speed_potion";
       action_list_str += "/innervate,trigger=-2000";
       if ( talents.force_of_nature ) action_list_str+="/treants";
@@ -3856,7 +3903,7 @@ void druid_t::interrupt()
 {
   player_t::interrupt();
 
-  if ( melee_attack ) melee_attack -> cancel();
+  if ( main_hand_attack ) main_hand_attack -> cancel();
 }
 
 // druid_t::clear_debuffs ===================================================
@@ -4205,7 +4252,7 @@ int druid_t::decode_set( item_t& item )
 
   bool is_caster = ( strstr( s, "cover"     ) || 
                      strstr( s, "mantle"    ) ||
-                     strstr( s, "vestments" ) ||
+                     strstr( s, "vestment" ) ||
                      strstr( s, "trousers"  ) ||
                      strstr( s, "gloves"    ) );
   
@@ -4289,14 +4336,14 @@ int druid_t::target_swing()
   }
   if ( result == RESULT_PARRY )
   {
-    if ( melee_attack && melee_attack -> execute_event )
+    if ( main_hand_attack && main_hand_attack -> execute_event )
     {
-      double swing_time = melee_attack -> time_to_execute;
-      double max_reschedule = ( melee_attack -> execute_event -> occurs() - 0.20 * swing_time ) - sim -> current_time;
+      double swing_time = main_hand_attack -> time_to_execute;
+      double max_reschedule = ( main_hand_attack -> execute_event -> occurs() - 0.20 * swing_time ) - sim -> current_time;
 
       if ( max_reschedule > 0 )
       {
-        melee_attack -> reschedule_execute( std::min( ( 0.40 * swing_time ), max_reschedule ) );
+        main_hand_attack -> reschedule_execute( std::min( ( 0.40 * swing_time ), max_reschedule ) );
         procs_parry_haste -> occur();
       }
     }

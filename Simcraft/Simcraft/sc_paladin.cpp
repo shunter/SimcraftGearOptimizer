@@ -53,6 +53,7 @@ struct paladin_t : public player_t
   buff_t* buffs_libram_of_reciprocation;
   buff_t* buffs_libram_of_valiance;
   buff_t* buffs_tier8_4pc_tank;
+  buff_t* buffs_libram_of_three_truths;
 
   // Gains
   gain_t* gains_divine_plea;
@@ -71,9 +72,6 @@ struct paladin_t : public player_t
 
   // Cooldowns
   cooldown_t* cooldowns_divine_storm;
-
-  // Auto-Attack
-  attack_t* auto_attack;
 
   struct talents_t
   {
@@ -178,6 +176,7 @@ struct paladin_t : public player_t
     int radiance;
     int reciprocation;
     int resurgence;
+    int three_truths;
     int valiance;
     int venture_co_protection;
     int venture_co_retribution;
@@ -205,8 +204,6 @@ struct paladin_t : public player_t
     tier10_2pc_procs_from_strikes     = false;
 
     cooldowns_divine_storm = get_cooldown( "divine_storm" );
-
-    auto_attack = 0;
   }
 
   ~paladin_t()
@@ -528,7 +525,7 @@ struct auto_attack_t : public paladin_attack_t
       paladin_attack_t( "auto_attack", p )
   {
     assert( p -> main_hand_weapon.type != WEAPON_NONE );
-    p -> auto_attack = new melee_t( p );
+    p -> main_hand_attack = new melee_t( p );
 
     trigger_gcd = 0;
   }
@@ -536,14 +533,14 @@ struct auto_attack_t : public paladin_attack_t
   virtual void execute()
   {
     paladin_t* p = player -> cast_paladin();
-    p -> auto_attack -> schedule_execute();
+    p -> main_hand_attack -> schedule_execute();
   }
 
   virtual bool ready()
   {
     paladin_t* p = player -> cast_paladin();
     if ( p -> buffs.moving -> check() ) return false;
-    return( p -> auto_attack -> execute_event == 0 ); // not swinging
+    return( p -> main_hand_attack -> execute_event == 0 ); // not swinging
   }
 };
 
@@ -644,6 +641,7 @@ struct crusader_strike_t : public paladin_attack_t
     if ( p -> librams.    deadly_gladiators_fortitude ) p -> buffs_libram_of_fortitude -> trigger( 1, 120 );
     if ( p -> librams.   furious_gladiators_fortitude ) p -> buffs_libram_of_fortitude -> trigger( 1, 144 );
     if ( p -> librams.relentless_gladiators_fortitude ) p -> buffs_libram_of_fortitude -> trigger( 1, 172 );
+    if ( p -> librams.                   three_truths ) p -> buffs_libram_of_three_truths -> trigger();
   }
 };
 
@@ -1412,17 +1410,24 @@ struct judgement_t : public paladin_attack_t
     case SEAL_OF_VENGEANCE:     return seal_of_vengeance;
     case SEAL_OF_WISDOM:        return seal_of_wisdom;
     }
-    assert( 0 ); 
     return 0;
   }
 
-  virtual double cost() SC_CONST { return active_seal() -> cost(); }
+  virtual double cost() SC_CONST 
+  { 
+    action_t* seal = active_seal(); 
+    if ( ! seal ) return 0.0;
+    return seal -> cost(); 
+  }
 
   virtual void execute()
   {
     paladin_t* p = player -> cast_paladin();
     target_t* t = sim -> target;
     action_t* seal = active_seal();
+
+    if ( ! seal )
+      return;
 
     seal -> execute();
 
@@ -1444,8 +1449,9 @@ struct judgement_t : public paladin_attack_t
       {
         t -> debuffs.judgements_of_the_just -> trigger();
       }
-      // FIXME! Assume JoW for now.
-      t -> debuffs.judgement_of_wisdom -> trigger();
+      // FIXME! Assume JoW for now unless override set to 0.
+      if ( sim -> overrides.judgement_of_wisdom )
+        t -> debuffs.judgement_of_wisdom -> trigger();
     }
     trigger_judgements_of_the_wise( seal );
     
@@ -1457,7 +1463,9 @@ struct judgement_t : public paladin_attack_t
 
   virtual bool ready()
   {
-    if( ! active_seal() -> ready() ) return false;
+    action_t* seal = active_seal();
+    if( ! seal ) return false;
+    if( ! seal -> ready() ) return false;
     return paladin_attack_t::ready();
   }
 };
@@ -2143,7 +2151,7 @@ void paladin_t::interrupt()
 {
   player_t::interrupt();
 
-  if ( auto_attack ) auto_attack -> cancel();
+  if ( main_hand_attack ) main_hand_attack -> cancel();
 }
 
 // paladin_t::init_gains ====================================================
@@ -2258,10 +2266,11 @@ void paladin_t::init_items()
   else if ( libram == "libram_of_radiance"                        ) librams.radiance = 1;
   else if ( libram == "libram_of_reciprocation"                   ) librams.reciprocation = 1;
   else if ( libram == "libram_of_resurgence"                      ) librams.resurgence = 1;
+  else if ( libram == "libram_of_three_truths"                    ) librams.three_truths = 1;
   else if ( libram == "libram_of_valiance"                        ) librams.valiance = 1;
+  else if ( libram == "libram_of_wracking"                        ) librams.wracking = 1;
   else if ( libram == "venture_co._libram_of_protection"          ) librams.venture_co_protection = 1;
   else if ( libram == "venture_co._libram_of_retribution"         ) librams.venture_co_retribution = 1;
-  else if ( libram == "libram_of_wracking"                        ) librams.wracking = 1;
   // To prevent warnings...
   else if ( libram == "blessed_book_of_nagrand" ) ;
   else if ( libram == "brutal_gladiators_libram_of_fortitude" ) ;
@@ -2280,6 +2289,7 @@ void paladin_t::init_items()
   else if ( libram == "libram_of_renewal" ) ;
   else if ( libram == "libram_of_repentance" ) ;
   else if ( libram == "libram_of_souls_redeemed" ) ;
+  else if ( libram == "libram_of_the_eternal_tower" ) ;
   else if ( libram == "libram_of_the_lightbringer" ) ;
   else if ( libram == "libram_of_the_resolute" ) ;
   else if ( libram == "libram_of_the_sacred_shield" ) ;
@@ -2380,6 +2390,7 @@ void paladin_t::init_buffs()
   buffs_libram_of_fortitude        = new stat_buff_t( this, "libram_of_fortitude",         STAT_ATTACK_POWER, 172, 1, 10.0            );
   buffs_libram_of_furious_blows    = new stat_buff_t( this, "libram_of_furious_blows",     STAT_CRIT_RATING,   61, 1,  5.0            );
   buffs_libram_of_reciprocation    = new stat_buff_t( this, "libram_of_reciprocation",     STAT_CRIT_RATING,  173, 1, 10.0, 0.0, 0.15 );
+  buffs_libram_of_three_truths     = new stat_buff_t( this, "libram_of_three_truths",      STAT_STRENGTH,      44, 5, 15.0            );
   buffs_libram_of_valiance         = new stat_buff_t( this, "libram_of_valiance",          STAT_STRENGTH,     200, 1, 16.0, 6.0, 0.70 );
   buffs_tier8_4pc_tank             = new stat_buff_t( this, "tier8_4pc_tank",              STAT_BLOCK_VALUE,  225, 1,  6.0            );
 }
@@ -2542,14 +2553,14 @@ int paladin_t::target_swing()
   }
   if ( result == RESULT_PARRY )
   {
-    if ( auto_attack && auto_attack -> execute_event )
+    if ( main_hand_attack && main_hand_attack -> execute_event )
     {
-      double swing_time = auto_attack -> time_to_execute;
-      double max_reschedule = ( auto_attack -> execute_event -> occurs() - 0.20 * swing_time ) - sim -> current_time;
+      double swing_time = main_hand_attack -> time_to_execute;
+      double max_reschedule = ( main_hand_attack -> execute_event -> occurs() - 0.20 * swing_time ) - sim -> current_time;
 
       if ( max_reschedule > 0 )
       {
-	auto_attack -> reschedule_execute( std::min( ( 0.40 * swing_time ), max_reschedule ) );
+	main_hand_attack -> reschedule_execute( std::min( ( 0.40 * swing_time ), max_reschedule ) );
 	procs_parry_haste -> occur();
       }
     }
