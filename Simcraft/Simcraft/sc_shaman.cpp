@@ -256,6 +256,7 @@ struct shaman_t : public player_t
   virtual int       primary_resource() SC_CONST { return RESOURCE_MANA; }
   virtual int       primary_role() SC_CONST     { return talents.dual_wield ? ROLE_HYBRID : ROLE_SPELL; }
   virtual int       primary_tree() SC_CONST;
+  virtual void      combat_begin();
 
   // Event Tracking
   virtual void regen( double periodicity );
@@ -586,6 +587,7 @@ static void trigger_windfury_weapon( attack_t* a )
 
   shaman_t* p = a -> player -> cast_shaman();
 
+  if ( a -> proc ) return;
   if ( a -> weapon == 0 ) return;
   if ( a -> weapon -> buff_type != WINDFURY_IMBUE ) return;
 
@@ -628,6 +630,7 @@ static void stack_maelstrom_weapon( attack_t* a )
 
 static void trigger_unleashed_rage( attack_t* a )
 {
+  if ( a -> sim -> P333 ) return;
   if ( a -> proc ) return;
 
   shaman_t* s = a -> player -> cast_shaman();
@@ -742,7 +745,8 @@ static void trigger_lightning_overload( spell_t* s,
 
 static void trigger_elemental_oath( spell_t* s )
 {
-  if ( s -> pseudo_pet ) return;
+  if ( s -> sim -> P333 ) return;
+  if ( s -> pseudo_pet  ) return;
 
   shaman_t* shaman = s -> player -> cast_shaman();
 
@@ -1881,6 +1885,7 @@ struct flame_shock_t : public shaman_spell_t
     
     // T8 2pc not yet changed
     if ( p -> set_bonus.tier8_2pc_caster() ) tick_may_crit = true;
+    if ( p -> sim -> P333 ) tick_may_crit = true;
 
     if ( p -> glyphs.shocking )
     {
@@ -1902,6 +1907,13 @@ struct flame_shock_t : public shaman_spell_t
     p -> buffs_tundra       -> trigger();
   }
 
+  virtual int scale_ticks_with_haste() SC_CONST
+  {
+    if ( player -> sim -> P333 )
+      return 1;
+  
+    return 0;
+  }
   virtual void tick()
   {
     shaman_t* p = player -> cast_shaman();
@@ -3247,8 +3259,8 @@ void shaman_t::init_buffs()
   buffs_maelstrom_weapon      = new buff_t( this, "maelstrom_weapon",      5,  30.0 );
   buffs_nature_vulnerability  = new buff_t( this, "nature_vulnerability",  4,  12.0 );
   buffs_natures_swiftness     = new buff_t( this, "natures_swiftness" );
-  buffs_shamanistic_rage      = new buff_t( this, "shamanistic_rage",      1,  15.0 );
-  buffs_tier10_2pc_melee      = new buff_t( this, "tier10_2pc_melee",      1,  15.0 ); 
+  buffs_shamanistic_rage      = new buff_t( this, "shamanistic_rage",      1,  15.0, 0.0, talents.shamanistic_rage      );
+  buffs_tier10_2pc_melee      = new buff_t( this, "tier10_2pc_melee",      1,  15.0, 0.0, set_bonus.tier10_2pc_melee() ); 
   buffs_tier10_4pc_melee      = new buff_t( this, "tier10_4pc_melee",      1,  10.0, 0.0, 0.15 ); //FIX ME - assuming no icd on this
   buffs_totem_of_wrath_glyph  = new buff_t( this, "totem_of_wrath_glyph",  1, 300.0, 0.0, glyphs.totem_of_wrath );
   buffs_water_shield          = new buff_t( this, "water_shield",          1, 600.0 );
@@ -3337,7 +3349,7 @@ void shaman_t::init_actions()
       {
         action_list_str += "/berserking";
       }
-      if ( talents.shamanistic_rage ) action_list_str += "/shamanistic_rage";
+      
       action_list_str += "/fire_elemental_totem";
       if ( talents.feral_spirit ) action_list_str += "/spirit_wolf";
       action_list_str += "/speed_potion";
@@ -3347,8 +3359,9 @@ void shaman_t::init_actions()
       action_list_str += "/flame_shock,if=!ticking";
       action_list_str += "/earth_shock/magma_totem/fire_nova/lightning_shield";
       if ( talents.lava_lash ) action_list_str += "/lava_lash";
-      action_list_str += "/shamanistic_rage,tier10_2pc_melee=1";
+      if ( talents.shamanistic_rage ) action_list_str += "/shamanistic_rage,tier10_2pc_melee=1";
       action_list_str += "/lightning_bolt,if=buff.maelstrom_weapon.stack=4";
+      if ( talents.shamanistic_rage ) action_list_str += "/shamanistic_rage";
     }
     else
     {
@@ -3383,7 +3396,11 @@ void shaman_t::init_actions()
       {
           action_list_str += "/speed_potion";
       }
-      if ( talents.elemental_mastery ) action_list_str += "/elemental_mastery";
+      if ( talents.elemental_mastery )
+      {
+          action_list_str += "/elemental_mastery,time_to_die<=17";
+          action_list_str += "/elemental_mastery,if=!buff.bloodlust.react";
+      }
       action_list_str += "/flame_shock,if=!ticking";
       if ( level >= 75 ) action_list_str += "/lava_burst,if=(dot.flame_shock.remains-cast_time)>=0";
       action_list_str += "/fire_nova,if=target.adds>2";
@@ -3480,6 +3497,25 @@ void shaman_t::regen( double periodicity )
     double water_shield_regen = periodicity * buffs_water_shield -> value() / 5.0;
 
     resource_gain( RESOURCE_MANA, water_shield_regen, gains_water_shield );
+  }
+}
+
+// shaman_t::combat_begin =================================================
+
+void shaman_t::combat_begin()
+{
+  player_t::combat_begin();
+
+  if ( sim -> P333 )
+  {
+    if ( talents.elemental_oath ) sim -> auras.elemental_oath -> trigger();
+
+    int ur = util_t::talent_rank( talents.unleashed_rage, 3, 4, 7, 10 );
+
+    if ( ur >= sim -> auras.unleashed_rage -> current_value )
+    {
+      sim -> auras.unleashed_rage -> trigger( 1, ur );
+    }
   }
 }
 
@@ -3678,12 +3714,12 @@ player_t* player_t::create_shaman( sim_t* sim, const std::string& name, int race
 
 void player_t::shaman_init( sim_t* sim )
 {
-  sim -> auras.elemental_oath    = new aura_t( sim, "elemental_oath",    1, 15.0 );
+  sim -> auras.elemental_oath    = new aura_t( sim, "elemental_oath",    1, ( sim -> P333 ? 0.0 : 15.0 ) );
   sim -> auras.flametongue_totem = new aura_t( sim, "flametongue_totem", 1, 300.0 );
   sim -> auras.mana_spring_totem = new aura_t( sim, "mana_spring_totem", 1, 300.0 );
   sim -> auras.strength_of_earth = new aura_t( sim, "strength_of_earth", 1, 300.0 );
   sim -> auras.totem_of_wrath    = new aura_t( sim, "totem_of_wrath",    1, 300.0 );
-  sim -> auras.unleashed_rage    = new aura_t( sim, "unleashed_rage",    1, 10.0 );
+  sim -> auras.unleashed_rage    = new aura_t( sim, "unleashed_rage",    1, ( sim -> P333 ? 0.0 : 10.0 ) );
   sim -> auras.windfury_totem    = new aura_t( sim, "windfury_totem",    1, 300.0 );
   sim -> auras.wrath_of_air      = new aura_t( sim, "wrath_of_air",      1, 300.0 );
 

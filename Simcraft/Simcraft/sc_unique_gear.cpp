@@ -397,9 +397,8 @@ static void register_nibelung( item_t* item )
       background  = true;
       may_miss = false;
       may_crit = true;
-      // FIXME! Still not sure about the size of the buff.
-      base_dd_min = 1061 * 1.40;
-      base_dd_max = 1189 * 1.40;
+      base_dd_min = 1591;
+      base_dd_max = 1785;
       base_crit = 0.05;
       reset();
     }
@@ -416,7 +415,7 @@ static void register_nibelung( item_t* item )
       name = "nibelung";
       // Valkyr gets off about 16 casts in 30sec
       if ( remaining == 0 ) remaining = 16;
-      sim -> add_event( this, 1.875 );
+      sim -> add_event( this, 1.85 );
     }
     virtual void execute()
     {
@@ -447,7 +446,7 @@ static void register_nibelung( item_t* item )
              a -> pseudo_pet )
         return;
 
-      if ( rng -> roll( 0.01 ) )
+      if ( rng -> roll( 0.02 ) )
       {
         if ( sim -> log ) log_t::output( sim, "%s summons a Valkyr from the Halls of Valhalla", a -> player -> name() );
         new ( sim ) nibelung_event_t( sim, a -> player, spell );
@@ -563,6 +562,7 @@ static void register_tiny_abom( item_t* item )
       {
         attack_t *attack = first_stack_attack;
         assert( attack != NULL );
+        first_stack_attack = NULL;
         buff -> expire();
         // This is pretty much a hack to repeat a melee attack under a
         // different name with slightly different parameters.
@@ -579,7 +579,6 @@ static void register_tiny_abom( item_t* item )
         attack -> proc = false;
         std::swap( proc_name, attack -> name_str );
         std::swap( old_stats, attack -> stats );
-        first_stack_attack = NULL;
       }
     }
   };
