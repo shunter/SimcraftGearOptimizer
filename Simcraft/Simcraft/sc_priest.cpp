@@ -212,6 +212,7 @@ struct priest_t : public player_t
   virtual double    composite_armor() SC_CONST;
   virtual double    composite_attribute_multiplier( int attr ) SC_CONST;
   virtual double    composite_spell_power( int school ) SC_CONST;
+  virtual double    composite_player_multiplier( int school ) SC_CONST;
 
   virtual void      regen( double periodicity );
   virtual action_expr_t* create_expression( action_t*, const std::string& name );
@@ -397,7 +398,6 @@ void priest_spell_t::player_buff()
 
   if ( school == SCHOOL_SHADOW )
   {
-    player_multiplier *= 1.0 + p -> buffs_shadow_form -> check() * p -> constants.shadow_form_value;
     player_multiplier *= 1.0 + p -> buffs_shadow_weaving -> stack() * p -> constants.shadow_weaving_value;
   }
 
@@ -1059,7 +1059,7 @@ struct mind_flay_t : public priest_spell_t
 
     if ( p -> set_bonus.tier10_4pc_caster() )
     {
-      base_tick_time -= 0.5 / num_ticks;
+      base_tick_time -= 0.51 / num_ticks;
     }
 
     base_cost  = 0.09 * p -> resource_base[ RESOURCE_MANA ];
@@ -1924,6 +1924,20 @@ double priest_t::composite_spell_power( int school ) SC_CONST
   return floor( sp );
 }
 
+// priest_t::composite_player_multiplier =========================================
+
+double priest_t::composite_player_multiplier( int school ) SC_CONST
+{
+  double m = player_t::composite_player_multiplier( school );
+
+  if ( school == SCHOOL_SHADOW )
+  {
+    m *= 1.0 + buffs_shadow_form -> check() * constants.shadow_form_value;
+  }
+
+  return m;
+}
+
 // priest_t::create_action ===================================================
 
 action_t* priest_t::create_action( const std::string& name,
@@ -2002,6 +2016,7 @@ void priest_t::init_glyphs()
     else if ( n == "fortitude"         ) ;
     else if ( n == "guardian_spirit"   ) ;
     else if ( n == "levitate"          ) ;
+    else if ( n == "mind_sear"         ) ;
     else if ( n == "pain_suppression"  ) ;
     else if ( n == "power_word_shield" ) ;
     else if ( n == "prayer_of_healing" ) ;
@@ -2475,22 +2490,22 @@ bool priest_t::create_profile( std::string& profile_str, int save_type )
     }
     if ( use_mind_blast != 1 ) 
     { 
-      temp_str = use_mind_blast;
+      temp_str = util_t::to_string( use_mind_blast );
       profile_str += "use_mind_blast=" + temp_str + "\n"; 
     }
     if ( hasted_devouring_plague != -1 ) 
     { 
-      temp_str = hasted_devouring_plague;
+      temp_str = util_t::to_string( hasted_devouring_plague );
       profile_str += "hasted_devouring_plague=" + temp_str + "\n"; 
     }
     if ( hasted_shadow_word_pain != -1 ) 
     { 
-      temp_str = hasted_shadow_word_pain;
+      temp_str = util_t::to_string( hasted_shadow_word_pain );
       profile_str += "hasted_shadow_word_pain=" + temp_str + "\n"; 
     }
     if ( hasted_vampiric_touch != -1 ) 
     { 
-      temp_str = hasted_vampiric_touch;
+      temp_str = util_t::to_string( hasted_vampiric_touch );
       profile_str += "hasted_vampiric_touch=" + temp_str + "\n"; 
     }
   }
