@@ -636,7 +636,7 @@ struct hunter_pet_t : public pet_t
 		talent_translation_t *translation_table;
 		if ( group() == PET_FEROCITY )
 		{
-		  talent_translation_t group_table[] = 
+		  talent_translation_t group_table[] =
 		  {
 			{  1, 2, &( talents.cobra_reflexes         ), 0, 0 },
 			{  2, 0, NULL                               , 0, 0 },
@@ -663,7 +663,7 @@ struct hunter_pet_t : public pet_t
 		}
 		else if ( group() == PET_CUNNING )
 		{
-		  talent_translation_t group_table[] = 
+		  talent_translation_t group_table[] =
 		  {
 			{  1, 2, &( talents.cobra_reflexes         ), 0, 0 },
 			{  2, 0, NULL                               , 0, 0 },
@@ -969,7 +969,7 @@ static void check_pet_type( action_t* a, int pet_type )
 
   if ( p -> pet_type != pet_type )
   {
-    util_t::fprintf( a -> sim -> output_file, 
+    util_t::fprintf( a -> sim -> output_file,
 		     "\nsimulationcraft: Player %s has pet %s attempting to use action %s that is not available to that class of pets.\n",
 		     o -> name(), p -> name(), a -> name() );
     a -> background = true;
@@ -1059,7 +1059,7 @@ struct hunter_pet_attack_t : public attack_t
           p -> sim -> auras.ferocious_inspiration -> trigger( 1, o -> talents.ferocious_inspiration, o -> talents.ferocious_inspiration > 0 );
         p -> buffs_frenzy -> trigger();
         if ( special ) trigger_invigoration( this );
-        
+
         p -> buffs_wolverine_bite -> trigger();
       }
     }
@@ -1085,7 +1085,7 @@ struct hunter_pet_attack_t : public attack_t
 
     player_multiplier *= 1.0 + p -> buffs_monstrous_bite -> stack() * 0.03;
 
-    if ( p -> buffs_culling_the_herd -> up() ) 
+    if ( p -> buffs_culling_the_herd -> up() )
       player_multiplier *= 1.0 + ( p -> buffs_culling_the_herd -> value() * 0.01 );
 
     if ( p -> sim -> target -> health_percentage() < 35 )
@@ -1412,7 +1412,7 @@ struct hunter_pet_spell_t : public spell_t
 
     if ( o -> buffs_cobra_strikes -> up() ) player_crit += 1.0;
 
-    if ( p -> buffs_culling_the_herd -> up() ) 
+    if ( p -> buffs_culling_the_herd -> up() )
       player_multiplier *= 1.0 + ( p -> buffs_culling_the_herd -> value() * 0.01 );
 
     if ( p -> buffs_kill_command -> up() )
@@ -1740,8 +1740,8 @@ void hunter_attack_t::player_buff()
   }
   player_multiplier *= 1.0 + p -> active_black_arrow * 0.06;
   player_crit += p -> buffs_master_tactician -> value();
-    
-  if ( p -> buffs_culling_the_herd -> up() ) 
+
+  if ( p -> buffs_culling_the_herd -> up() )
     player_multiplier *= 1.0 + ( p -> buffs_culling_the_herd -> value() * 0.01 );
 
   if ( p -> buffs_tier10_2pc -> up() )
@@ -1794,12 +1794,12 @@ struct ranged_t : public hunter_attack_t
     if ( result_is_hit() )
     {
       hunter_t* p = player -> cast_hunter();
-      trigger_wild_quiver( this );     
+      trigger_wild_quiver( this );
       if ( p -> active_aspect == ASPECT_HAWK )
         p -> buffs_improved_aspect_of_the_hawk -> trigger( 1, iaoth_bonus );
 
       p -> buffs_tier10_2pc -> trigger();
-    }   
+    }
   }
 };
 
@@ -2357,7 +2357,7 @@ struct explosive_shot_t : public hunter_attack_t
     hunter_attack_t::execute();
     hunter_t* p = player -> cast_hunter();
     p -> buffs_lock_and_load -> decrement();
-  }    
+  }
 
   virtual bool ready()
   {
@@ -2711,7 +2711,9 @@ struct steady_shot_t : public hunter_attack_t
 
     base_cost *= 1.0 - p -> talents.master_marksman * 0.05;
 
-    base_multiplier *= 1.0 + p -> talents.sniper_training              * 0.02;
+    base_multiplier *= 1.0 + p -> talents.sniper_training              * 0.02
+                       + p -> talents.ferocious_inspiration * ( p -> sim -> P333 ? 0.03 : 0 );
+
     base_multiplier *= p -> ranged_weapon_specialization_multiplier();
 
     base_crit += p -> talents.survival_instincts * 0.02;
@@ -3024,9 +3026,9 @@ struct rapid_fire_t : public hunter_spell_t
   {
     hunter_t* p = player -> cast_hunter();
     if ( sim -> log ) log_t::output( sim, "%s performs %s", p -> name(), name() );
-    
+
     p -> buffs_rapid_fire -> trigger( 1, ( p -> glyphs.rapid_fire ? 0.48 : 0.40 ) );
-    
+
     consume_resource();
     update_ready();
   }
@@ -3460,7 +3462,7 @@ void hunter_t::init_base()
 void hunter_t::init_buffs()
 {
   player_t::init_buffs();
-  
+
   buffs_aspect_of_the_hawk          = new buff_t( this, "aspect_of_the_hawk",          1,  0.0 );
   buffs_aspect_of_the_viper         = new buff_t( this, "aspect_of_the_viper",         1,  0.0 );
   buffs_beast_within                = new buff_t( this, "beast_within",                1, 10.0,  0.0, talents.beast_within );
@@ -3478,7 +3480,7 @@ void hunter_t::init_buffs()
   buffs_rapid_fire                  = new buff_t( this, "rapid_fire",                  1, 15.0 );
 
   buffs_tier10_2pc                  = new buff_t( this, "tier10_2pc",                  1, 10.0,  0.0, ( set_bonus.tier10_2pc_melee() ? 0.05 : 0 ) );
-  buffs_tier10_4pc                  = new buff_t( this, "tier10_4pc",                  1, 10.0,  0.0, ( set_bonus.tier10_4pc_melee() ? 0.05 : 0 ) );  
+  buffs_tier10_4pc                  = new buff_t( this, "tier10_4pc",                  1, 10.0,  0.0, ( set_bonus.tier10_4pc_melee() ? 0.05 : 0 ) );
 
   buffs_tier8_4pc = new stat_buff_t( this, "tier8_4pc", STAT_ATTACK_POWER, 600, 1, 15.0, 45.0, ( set_bonus.tier8_4pc_melee() ? 0.1  : 0 ) );
 
@@ -3586,7 +3588,7 @@ void hunter_t::init_unique_gear()
     {
       attack_t* attack;
       rng_t* rng;
-      zods_trigger_t( player_t* p, attack_t* a ) : action_callback_t( p -> sim, p ), attack(a) 
+      zods_trigger_t( player_t* p, attack_t* a ) : action_callback_t( p -> sim, p ), attack(a)
       {
 	rng = p -> get_rng( "zods_repeating_longbow" );
       }
@@ -3653,7 +3655,7 @@ void hunter_t::init_actions()
     {
       if( talents.aimed_shot ) action_list_str += "/aimed_shot";
     }
-    if ( talents.chimera_shot ) 
+    if ( talents.chimera_shot )
     {
       action_list_str += "/wait,sec=0.1,if=cooldown.chimera_shot.remains>0&cooldown.chimera_shot.remains<0.25";
       action_list_str += "/chimera_shot";
@@ -3699,7 +3701,7 @@ int hunter_t::primary_tree() SC_CONST
 void hunter_t::combat_begin()
 {
   player_t::combat_begin();
-  
+
   if ( sim -> P333 )
     sim -> auras.ferocious_inspiration -> trigger( 1, talents.ferocious_inspiration, talents.ferocious_inspiration > 0 );
 }
@@ -3764,7 +3766,7 @@ double hunter_t::composite_attack_power_multiplier() SC_CONST
   {
     mult *= 1.1;
   }
-  
+
   return mult;
 }
 

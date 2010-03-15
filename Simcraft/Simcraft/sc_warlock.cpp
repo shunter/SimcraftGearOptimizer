@@ -2970,7 +2970,7 @@ struct life_tap_t : public warlock_spell_t
     harmful = false;
 
     base_tap = util_t::ability_rank( player -> level,  1490,80,  710,68,  500,0 );
-	direct_power_mod = 0.96;
+	direct_power_mod = 0.5;
   }
 
   virtual void execute()
@@ -2984,8 +2984,8 @@ struct life_tap_t : public warlock_spell_t
     mana *= ( 1.0 + p -> talents.improved_life_tap * 0.10 );
     p -> resource_gain( RESOURCE_MANA, mana, p -> gains_life_tap );
     if ( p -> talents.mana_feed ) p -> active_pet -> resource_gain( RESOURCE_MANA, mana );
-    p -> buffs_life_tap_glyph -> trigger();
     p -> buffs_tier7_4pc_caster -> trigger();
+	p -> buffs_life_tap_glyph -> trigger();
   }
 
   virtual bool ready()
@@ -3078,10 +3078,9 @@ struct dark_pact_t : public warlock_spell_t
     warlock_t* p = player -> cast_warlock();
     if ( sim -> log ) log_t::output( sim, "%s performs %s", p -> name(), name() );
     p -> procs_dark_pact -> occur();
-    player_buff();
-    double mana = ( base_dd_max + ( direct_power_mod * p -> composite_spell_power( SCHOOL_SHADOW ) ) ) * base_multiplier * player_multiplier;
-    p -> resource_gain( RESOURCE_MANA, mana, p -> gains_dark_pact );
     p -> buffs_life_tap_glyph -> trigger();
+    double mana = base_dd_max + ( direct_power_mod * p -> composite_spell_power( SCHOOL_SHADOW ) );
+    p -> resource_gain( RESOURCE_MANA, mana, p -> gains_dark_pact );
   }
 
   virtual bool ready()
@@ -3520,7 +3519,8 @@ struct demonic_pact_callback_t : public action_callback_t
 	// HACK ALERT!!! Remove "double-dip" during crit scale factor generation.
 	if ( sim -> scaling -> scale_stat == STAT_CRIT_RATING && o -> talents.improved_demonic_tactics )
 	{
-		if ( ! sim -> rng -> roll( a -> player_crit / ( a -> player_crit + sim -> scaling -> scale_value * o -> talents.improved_demonic_tactics * 0.10 / o -> rating.spell_crit ) ) ) return;
+		if ( ! sim -> rng -> roll( a -> player_crit / ( a -> player_crit + sim -> scaling -> scale_value * o -> talents.improved_demonic_tactics * 0.10 / o -> rating.spell_crit ) ) ) 
+			return;
 	}
 	// HACK ALERT!!! Remove "double-dip" during int scale factor generation.
 	if ( sim -> scaling -> scale_stat == STAT_INTELLECT && o -> talents.improved_demonic_tactics )
@@ -3530,15 +3530,8 @@ struct demonic_pact_callback_t : public action_callback_t
 
     // HACK ALERT!!!  To prevent spell power contributions from ToW/FT/IDS/DP buffs, we fiddle with player type
     o -> type = PLAYER_GUARDIAN;
-    double buff = o -> composite_spell_power( SCHOOL_MAX );
+    double buff = o -> composite_spell_power( SCHOOL_MAX ) * 0.10;
     o -> type = WARLOCK;
-
-    if ( o -> buffs_life_tap_glyph -> check() )
-    {
-      buff -= o -> spirit() * 0.20;
-    }
-
-    buff *= 0.10;
 
     for( player_t* p = sim -> player_list; p; p = p -> next )
     {
@@ -3554,7 +3547,17 @@ struct demonic_pact_callback_t : public action_callback_t
 	  // HACK ALERT!!! Remove "double-dip" during spirit scale factor generation.
       if ( p != o && sim -> scaling -> scale_stat == STAT_SPIRIT )
       {
-        p -> buffs.demonic_pact -> current_value -= sim -> scaling -> scale_value * 0.30 * 0.10;
+        p -> buffs.demonic_pact -> current_value -= sim -> scaling -> scale_value * o -> spell_power_per_spirit * 0.10;
+      }
+	  // HACK ALERT!!! Remove "double-dip" during intellect scale factor generation.
+      if ( p != o && sim -> scaling -> scale_stat == STAT_INTELLECT )
+      {
+        p -> buffs.demonic_pact -> current_value -= sim -> scaling -> scale_value * o -> talents.demonic_knowledge * 0.04 * 0.10;
+      }
+	  // HACK ALERT!!! Remove "double-dip" during stamina scale factor generation.
+      if ( p != o && sim -> scaling -> scale_stat == STAT_STAMINA )
+      {
+        p -> buffs.demonic_pact -> current_value -= sim -> scaling -> scale_value * o -> talents.demonic_knowledge * 0.04 * 0.10;
       }
     }
   }
