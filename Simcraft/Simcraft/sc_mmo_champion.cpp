@@ -26,9 +26,9 @@ static xml_node_t* download_id( sim_t*             sim,
   xml_node_t* node;
 
   if ( cache_only )
-    node = xml_t::download_cache( url );
+    node = xml_t::download_cache( sim, url );
   else
-    node = xml_t::download( url, "<h4>Item #", 0 );
+    node = xml_t::download( sim, url, "<h4>Item #", 0 );
 
   if ( sim -> debug ) xml_t::print( node );
   return node;
@@ -340,6 +340,25 @@ static bool parse_item_name( item_t&            item,
   return true;
 }
 
+// parse_item_heroic =========================================================
+
+static bool parse_item_heroic( item_t&     item,
+                               xml_node_t* node )
+{
+  std::string heroic_str;
+  item.armory_heroic_str = "";
+
+  if ( xml_t::get_value( heroic_str, node, "tti-heroic" ) )
+  {
+    item.armory_heroic_str = "1";
+  }
+
+  armory_t::format( item.armory_heroic_str );
+
+  return true;
+}
+
+
 } // ANONYMOUS NAMESPACE ====================================================
 
 
@@ -356,9 +375,8 @@ int mmo_champion_t::parse_gem( item_t&            item,
   if ( ! node )
   {
     if ( ! cache_only )
-      util_t::fprintf( item.sim -> output_file, 
-		       "\nsimulationcraft: Player %s unable to download gem id %s from mmo-champion.\n", 
-		       item.player -> name(), gem_id.c_str() );
+      item.sim -> errorf( "Player %s unable to download gem id %s from mmo-champion.\n", 
+			  item.player -> name(), gem_id.c_str() );
     return GEM_NONE;
   }
 
@@ -416,7 +434,7 @@ bool mmo_champion_t::download_glyph( sim_t*             sim,
   if ( ! node || ! xml_t::get_value( glyph_name, node, "title/." ) )
   {
     if ( ! cache_only )
-      util_t::fprintf( sim -> output_file, "\nsimulationcraft: Unable to download glyph id %s from mmo-champion\n", glyph_id.c_str() );
+      sim -> errorf( "Unable to download glyph id %s from mmo-champion\n", glyph_id.c_str() );
     return false;
   }
 
@@ -439,25 +457,31 @@ bool mmo_champion_t::download_item( item_t&            item,
   if ( ! node )
   {
     if ( ! cache_only )
-      util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s nable to download item id '%s' from mmo-champion at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
+      item.sim -> errorf( "Player %s nable to download item id '%s' from mmo-champion at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_item_name( item, node, item_id ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine item name for id '%s' at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine item name for id '%s' at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
+    return false;
+  }
+
+  if ( ! parse_item_heroic( item, node ) )
+  {
+    item.sim -> errorf( "Player %s unable to determine heroic flag for id '%s' at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_item_stats( item, node ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine stats for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine stats for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_weapon( item, node ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine weapon info for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine weapon info for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
@@ -478,37 +502,43 @@ bool mmo_champion_t::download_slot( item_t&            item,
   if ( ! node )
   {
     if ( ! cache_only )
-      util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s nable to download item id '%s' from mmo-champion at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
+      item.sim -> errorf( "Player %s nable to download item id '%s' from mmo-champion at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_item_name( item, node, item_id ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine item name for id '%s' at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine item name for id '%s' at slot %s.\n", p -> name(), item_id.c_str(), item.slot_name() );
+    return false;
+  }
+
+  if ( ! parse_item_heroic( item, node ) )
+  {
+    item.sim -> errorf( "Player %s unable to determine heroic flag for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_item_stats( item, node ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine stats for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine stats for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_weapon( item, node ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine weapon info for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine weapon info for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
   if ( ! parse_gems( item, node, gem_ids ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to determine gems for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to determine gems for item '%s' at slot %s.\n", p -> name(), item.name(), item.slot_name() );
     return false;
   }
 
   if ( ! enchant_t::download( item, enchant_id ) )
   {
-    util_t::fprintf( item.sim -> output_file, "\nsimulationcraft: Player %s unable to parse enchant id %s for item \"%s\" at slot %s.\n", p -> name(), enchant_id.c_str(), item.name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to parse enchant id %s for item \"%s\" at slot %s.\n", p -> name(), enchant_id.c_str(), item.name(), item.slot_name() );
     //return false;
   }
 

@@ -213,7 +213,7 @@ static bool parse_talent_url( sim_t* sim,
     int part_count = util_t::string_split( parts, url, "&" );
     if( part_count <= 0 )
     {
-      util_t::fprintf( sim -> output_file, "Malformed talent string: %s\n", url.c_str() );
+      sim -> errorf( "Player %s has malformed talent string: %s\n", p -> name(), url.c_str() );
       return false;
     }
 
@@ -230,7 +230,7 @@ static bool parse_talent_url( sim_t* sim,
     }
   }
 
-  util_t::fprintf( sim -> output_file, "simulationcraft: Unable to decode talent string %s for %s\n", url.c_str(), p -> name() );
+  sim -> errorf( "Unable to decode talent string %s for %s\n", url.c_str(), p -> name() );
 
   return false;
 }
@@ -320,7 +320,7 @@ player_t::player_t( sim_t*             s,
     buff_list( 0 ), proc_list( 0 ), gain_list( 0 ), stats_list( 0 ), uptime_list( 0 ),
     save_str( "" ), save_gear_str( "" ), save_talents_str( "" ), save_actions_str( "" ),
     comment_str( "" ),
-    meta_gem( META_GEM_NONE ), normalized_to( STAT_NONE ), scaling_lag( 0 ), rng_list( 0 )
+    meta_gem( META_GEM_NONE ), scaling_lag( 0 ), rng_list( 0 )
 {
   if ( sim -> debug ) log_t::output( sim, "Creating Player %s", name() );
   player_t** last = &( sim -> player_list );
@@ -461,7 +461,7 @@ bool player_t::init( sim_t* sim )
 
   if ( too_quiet && ! sim -> debug )
   {
-    log_t::output( sim, "No active players in sim!" );
+    sim -> errorf( "No active players in sim!" );
     return false;
   }
 
@@ -499,7 +499,7 @@ bool player_t::init( sim_t* sim )
         player_t* p = sim -> find_player( player_names[ j ] );
         if ( ! p )
         {
-          util_t::fprintf( sim -> output_file, "simulationcraft: ERROR! Unable to find player %s\n", player_names[ j ].c_str() );
+          sim -> errorf( "Unable to find player %s for party creation.\n", player_names[ j ].c_str() );
           return false;
         }
         p -> party = party_index;
@@ -569,7 +569,7 @@ void player_t::init_items()
   {
     if ( find_item( splits[ i ] ) )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Player %s has multiple %s equipped.\n", name(), splits[ i ].c_str() );
+      sim -> errorf( "Player %s has multiple %s equipped.\n", name(), splits[ i ].c_str() );
     }
     items.push_back( item_t( this, splits[ i ] ) );
   }
@@ -583,7 +583,7 @@ void player_t::init_items()
 
     if ( ! item.init() )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Unable to initialize item '%s' on player '%s'\n", item.name(), name() );
+      sim -> errorf( "Unable to initialize item '%s' on player '%s'\n", item.name(), name() );
       return;
     }
 
@@ -648,6 +648,8 @@ void player_t::init_meta_gem( gear_stats_t& item_stats )
   else if ( meta_gem == META_SWIFT_STARFIRE          ) item_stats.spell_power  += 12;
   else if ( meta_gem == META_SWIFT_STARFLARE         ) item_stats.attack_power += 34;
   else if ( meta_gem == META_TIRELESS_STARFLARE      ) item_stats.spell_power  += 20;
+  else if ( meta_gem == META_TRENCHANT_EARTHSHATTER  ) item_stats.spell_power  += 20;
+  else if ( meta_gem == META_TRENCHANT_EARTHSIEGE    ) item_stats.spell_power  += 25;
 
   if ( meta_gem == META_AUSTERE_EARTHSIEGE )
   {
@@ -828,7 +830,16 @@ void player_t::init_resources( bool force )
       resource_initial[ i ] = resource_base[ i ] + gear.resource[ i ] + enchant.resource[ i ] + ( is_pet() ? 0 : sim -> enchant.resource[ i ] );
 
       if ( i == RESOURCE_MANA   ) resource_initial[ i ] += ( intellect() - adjust ) * mana_per_intellect + adjust;
-      if ( i == RESOURCE_HEALTH ) resource_initial[ i ] += (   stamina() - adjust ) * health_per_stamina + adjust;
+      if ( i == RESOURCE_HEALTH ) 
+      {
+        resource_initial[ i ] += (   stamina() - adjust ) * health_per_stamina + adjust;
+
+        if ( buffs.hellscreams_warsong -> check() || buffs.strength_of_wrynn -> check() )
+        {
+          // ICC buff.
+          resource_initial[ i ] *= 1.10;
+        }
+      }
     }
     resource_current[ i ] = resource_max[ i ] = resource_initial[ i ];
   }
@@ -874,7 +885,7 @@ void player_t::init_professions()
     int prof_type = util_t::parse_profession_type( prof_name );
     if ( prof_type == PROFESSION_NONE )
     {
-      util_t::fprintf( sim -> output_file, "Invalid profession encoding: %s\n", professions_str.c_str() );
+      sim -> errorf( "Invalid profession encoding: %s\n", professions_str.c_str() );
       return;
     }
 
@@ -927,7 +938,7 @@ void player_t::init_actions()
       action_t* a = create_action( action_name, action_options );
       if ( ! a )
       {
-        util_t::fprintf( sim -> output_file, "player_t: Unknown action: %s\n", splits[ i ].c_str() );
+        sim -> errorf( "Player %s has unknown action: %s\n", name(), splits[ i ].c_str() );
         return;
       }
 
@@ -959,10 +970,12 @@ void player_t::init_rating()
 
 void player_t::init_buffs()
 {
-  buffs.berserking      = new buff_t( this, "berserking",      1, 10.0 );
-  buffs.heroic_presence = new buff_t( this, "heroic_presence", 1       );
-  buffs.replenishment   = new buff_t( this, "replenishment",   1, 15.0 );
-  buffs.stoneform       = new buff_t( this, "stoneform",       1,  8.0 );
+  buffs.berserking           = new buff_t( this, "berserking",          1, 10.0 );
+  buffs.heroic_presence      = new buff_t( this, "heroic_presence",     1       );
+  buffs.replenishment        = new buff_t( this, "replenishment",       1, 15.0 );
+  buffs.stoneform            = new buff_t( this, "stoneform",           1,  8.0 );
+  buffs.hellscreams_warsong  = new buff_t( this, "hellscreams_warsong", 1       );
+  buffs.strength_of_wrynn    = new buff_t( this, "strength_of_wrynn",   1       );
 
   // Infinite-Stacking Buffs
   buffs.moving  = new buff_t( this, "moving",  -1 );
@@ -1293,6 +1306,8 @@ double player_t::composite_attack_hit() SC_CONST
 {
   double ah = attack_hit;
 
+  // Changes here may need to be reflected in the corresponding pet_t
+  // function in simulationcraft.h
   if ( buffs.heroic_presence -> check() ) ah += 0.01;
 
   return ah;
@@ -1665,6 +1680,8 @@ double player_t::composite_spell_hit() SC_CONST
 {
   double sh = spell_hit;
 
+  // Changes here may need to be reflected in the corresponding pet_t
+  // function in simulationcraft.h
   if ( buffs.heroic_presence -> check() ) sh += 0.01;
 
   return sh;
@@ -1712,6 +1729,12 @@ double player_t::composite_player_multiplier( int school ) SC_CONST
 
   if ( type != PLAYER_GUARDIAN )
   {
+    if ( buffs.hellscreams_warsong -> check() || buffs.strength_of_wrynn -> check() )
+    {
+      // ICC buff.
+      m *= 1.10;
+    }
+
     if ( school == SCHOOL_PHYSICAL )
     {
       if ( buffs.hysteria -> up() )
@@ -1845,14 +1868,23 @@ void player_t::combat_begin()
     schedule_ready();
   }
 
-  bool allow_heroic_presence =
+  bool is_alliance =
     (race == RACE_NIGHT_ELF) ||
     (race == RACE_GNOME)     ||
     (race == RACE_DWARF)     ||
     (race == RACE_HUMAN)     ||
     (race == RACE_DRAENEI);
 
-  if ( sim -> overrides.heroic_presence && allow_heroic_presence )
+  if ( sim -> overrides.strength_of_wrynn )
+  {
+    buffs.strength_of_wrynn -> trigger();
+  }
+  if ( sim -> overrides.hellscreams_warsong )
+  {
+    buffs.hellscreams_warsong -> trigger();
+  }
+
+  if ( sim -> overrides.heroic_presence && is_alliance )
   {
     buffs.heroic_presence -> trigger();
   }
@@ -2349,6 +2381,19 @@ bool player_t::resource_available( int    resource,
   return resource_current[ resource ] >= cost;
 }
 
+// player_t::normalize_by ===================================================
+
+int player_t::normalize_by() SC_CONST
+{
+  if ( sim -> normalized_stat != STAT_NONE ) 
+  {
+    return sim -> normalized_stat; 
+  }
+
+  return ( primary_role() == ROLE_SPELL ) ? STAT_SPELL_POWER : STAT_ATTACK_POWER;
+}
+
+
 // player_t::stat_gain ======================================================
 
 void player_t::stat_gain( int    stat,
@@ -2488,7 +2533,7 @@ void player_t::summon_pet( const char* pet_name,
       return;
     }
   }
-  util_t::fprintf( sim -> output_file, "\nsimulationcraft: Player %s is unable to summon pet '%s'\n", name(), pet_name );
+  sim -> errorf( "Player %s is unable to summon pet '%s'\n", name(), pet_name );
 }
 
 // player_t::dismiss_pet ====================================================
@@ -3119,8 +3164,8 @@ struct cycle_t : public action_t
       current_action = next;
       if ( ! current_action )
       {
-        util_t::fprintf( sim -> output_file, "simulationcraft: player %s has no actions after 'cycle'\n", player -> name() );
-        exit( 0 );
+        sim -> errorf( "Player %s has no actions after 'cycle'\n", player -> name() );
+        sim -> cancel();
       }
       for ( action_t* a = next; a; a = a -> next ) a -> background = true;
     }
@@ -3406,19 +3451,19 @@ struct use_item_t : public action_t
 
     if ( item_name.empty() )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Player %s has 'use_item' action with no 'name=' option.\n", player -> name() );
+      sim -> errorf( "Player %s has 'use_item' action with no 'name=' option.\n", player -> name() );
       return;
     }
 
     item = player -> find_item( item_name );
     if ( ! item )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Player %s attempting 'use_item' action with item '%s' which is not currently equipped.\n", player -> name(), item_name.c_str() );
+      sim -> errorf( "Player %s attempting 'use_item' action with item '%s' which is not currently equipped.\n", player -> name(), item_name.c_str() );
       return;
     }
     if ( ! item -> use.active() )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Player %s attempting 'use_item' action with item '%s' which has no 'use=' encoding.\n", player -> name(), item_name.c_str() );
+      sim -> errorf( "Player %s attempting 'use_item' action with item '%s' which has no 'use=' encoding.\n", player -> name(), item_name.c_str() );
       item = 0;
       return;
     }
@@ -3630,16 +3675,16 @@ bool player_t::parse_talent_trees( int talents[] )
 
 bool player_t::parse_talents_armory( const std::string& talent_string )
 {
-        int talents[MAX_TALENT_SLOTS] = {0};
+  int talents[MAX_TALENT_SLOTS] = {0};
 
   const char *buffer = talent_string.c_str();
 
   for(unsigned int i = 0; i < talent_string.size(); i++)
   {
-        char c = buffer[ i ];
+    char c = buffer[ i ];
     if ( c < '0' || c > '5' )
     {
-      util_t::fprintf( sim -> output_file, "\nsimulationcraft: Player %s has illegal character '%c' in talent encoding.\n", name(), c );
+      sim -> errorf( "Player %s has illegal character '%c' in talent encoding.\n", name(), c );
       return false;
     }
     talents[i] = c - '0';
@@ -3710,7 +3755,7 @@ bool player_t::parse_talents_wowhead( const std::string& talent_string )
   {
     if ( (tree >= MAX_TALENT_TREES) || (count > talent_list.size()) )
     {
-      util_t::fprintf( sim -> output_file, "Malformed wowhead talent string. Too many talents or trees specified.\n" );
+      sim -> errorf( "Player %s has malformed wowhead talent string. Too many talents or trees specified.\n", name() );
       return false;
     }
 
@@ -3735,7 +3780,7 @@ bool player_t::parse_talents_wowhead( const std::string& talent_string )
 
     if ( ! decode )
     {
-      util_t::fprintf( sim -> output_file, "Malformed wowhead talent string. Translation for '%c' unknown.\n", c );
+      sim -> errorf( "Player %s has malformed wowhead talent string. Translation for '%c' unknown.\n", name(), c );
       return false;
     }
 
@@ -4018,6 +4063,7 @@ bool player_t::create_profile( std::string& profile_str, int save_type )
         profile_str += item.slot_name();
         profile_str += "=";
         profile_str += item.name();
+        if ( item.heroic() ) profile_str += ",heroic=1";
         if ( ! item.encoded_weapon_str.empty() ) profile_str += ",weapon=" + item.encoded_weapon_str;
         if ( item.unique_enchant ) profile_str += ",enchant=" + item.encoded_enchant_str;
         profile_str += "\n";

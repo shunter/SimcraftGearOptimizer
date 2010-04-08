@@ -740,7 +740,7 @@ double druid_cat_attack_t::cost() SC_CONST
   druid_t* p = player -> cast_druid();
   double c = attack_t::cost();
   if ( c == 0 ) return 0;
-  if ( p -> buffs_omen_of_clarity -> check() ) return 0;
+  if ( harmful &&  p -> buffs_omen_of_clarity -> check() ) return 0;
   if ( p -> buffs_berserk -> check() ) c *= 0.5;
   return c;
 }
@@ -751,7 +751,7 @@ void druid_cat_attack_t::consume_resource()
 {
   druid_t* p = player -> cast_druid();
   attack_t::consume_resource();
-  if ( p -> buffs_omen_of_clarity -> up() )
+  if ( harmful && p -> buffs_omen_of_clarity -> up() )
   {
     // Treat the savings like a energy gain.
     double amount = attack_t::cost();
@@ -1082,8 +1082,8 @@ struct mangle_cat_t : public druid_cat_attack_t
     base_cost -= p -> talents.ferocity;
     base_cost -= p -> talents.improved_mangle * 2;
 
-    base_multiplier  *= 1.0 + p -> talents.savage_fury * 0.1
-                        + p -> glyphs.mangle * ( p -> sim -> P333 ? 0.1 : 0.0 );
+    base_multiplier  *= 1.0 + ( p -> talents.savage_fury * 0.1 +
+				p -> glyphs.mangle       * 0.1 );
   }
 
   virtual void execute()
@@ -1093,17 +1093,6 @@ struct mangle_cat_t : public druid_cat_attack_t
     {
       druid_t* p = player -> cast_druid();
       target_t* t = sim -> target;
-      if( ! sim -> overrides.mangle )
-      {
-        if ( ! p -> sim -> P333 )
-        {
-		  t -> debuffs.mangle -> duration = 12.0 + ( p -> glyphs.mangle ? 6.0 : 0.0 );
-	    }
-	    else
-	    {
-		  t -> debuffs.mangle -> duration = 60.0;
-	    }
-      }
       t -> debuffs.mangle -> trigger();
       trigger_infected_wounds( this );
       p -> buffs_terror -> trigger();
@@ -1249,6 +1238,7 @@ struct savage_roar_t : public druid_cat_attack_t
     requires_combo_points = true;
     base_cost = 25;
     id = 52610;
+    harmful = false;
 
     buff_value = 0.30;
     if( p -> glyphs.savage_roar ) buff_value += 0.03;
@@ -1257,12 +1247,15 @@ struct savage_roar_t : public druid_cat_attack_t
   virtual void execute()
   {
     druid_t* p = player -> cast_druid();
-
     double duration = 9.0 + 5.0 * p -> buffs_combo_points -> stack();
     if ( p -> set_bonus.tier8_4pc_melee() ) duration += 8.0;
+
+    // execute clears CP, so has to be after calculation duration
+    druid_cat_attack_t::execute();
+
     p -> buffs_savage_roar -> duration = duration;
     p -> buffs_savage_roar -> trigger( 1, buff_value );
-    p -> buffs_combo_points -> expire();
+    //p -> buffs_combo_points -> expire();
   }
 };
 
@@ -1552,7 +1545,7 @@ double druid_bear_attack_t::cost() SC_CONST
 {
   druid_t* p = player -> cast_druid();
   double c = attack_t::cost();
-  if ( p -> buffs_omen_of_clarity -> check() ) return 0;
+  if ( harmful && p -> buffs_omen_of_clarity -> check() ) return 0;
   return c;
 }
 
@@ -1562,7 +1555,7 @@ void druid_bear_attack_t::consume_resource()
 {
   druid_t* p = player -> cast_druid();
   attack_t::consume_resource();
-  if ( p -> buffs_omen_of_clarity -> up() )
+  if ( harmful && p -> buffs_omen_of_clarity -> up() )
   {
     // Treat the savings like a rage gain.
     double amount = attack_t::cost();
@@ -1868,8 +1861,8 @@ struct mangle_bear_t : public druid_bear_attack_t
     may_crit = true;
     base_cost -= p -> talents.ferocity;
 
-    base_multiplier *= 1.0 + p -> talents.savage_fury * 0.10
-                       + p -> glyphs.mangle * ( p -> sim -> P333 ? 0.1 : 0.0 );
+    base_multiplier *= 1.0 + ( p -> talents.savage_fury * 0.10 +
+			       p -> glyphs.mangle       * 0.10 );
 
     cooldown = p -> get_cooldown( "mangle_bear" );
     cooldown -> duration = 6.0 - p -> talents.improved_mangle * 0.5;
@@ -1883,17 +1876,6 @@ struct mangle_bear_t : public druid_bear_attack_t
     if ( result_is_hit() )
     {
       target_t* t = sim -> target;
-      if( ! sim -> overrides.mangle )
-      {
-        if ( ! p -> sim -> P333 )
-        {
-	      t -> debuffs.mangle -> duration = 12.0 + ( p -> glyphs.mangle ? 6.0 : 0.0 );
-	    }
-	    else
-	    {
-	      t -> debuffs.mangle -> duration = 60.0;
-	    }
-      }
       t -> debuffs.mangle -> trigger();
       trigger_infected_wounds( this );
       p -> buffs_terror -> trigger();
@@ -2057,7 +2039,7 @@ bool druid_spell_t::ready()
 double druid_spell_t::cost() SC_CONST
 {
   druid_t* p = player -> cast_druid();
-  if ( p -> buffs_omen_of_clarity -> check() ) return 0;
+  if ( harmful && p -> buffs_omen_of_clarity -> check() ) return 0;
   return spell_t::cost();
 }
 
@@ -2128,7 +2110,7 @@ void druid_spell_t::consume_resource()
 {
   druid_t* p = player -> cast_druid();
   spell_t::consume_resource();
-  if ( p -> buffs_omen_of_clarity -> up() )
+  if ( harmful && p -> buffs_omen_of_clarity -> up() )
   {
     // Treat the savings like a mana gain.
     double amount = spell_t::cost();
@@ -2905,7 +2887,8 @@ struct starfire_t : public druid_spell_t
 
         if ( ! p -> buffs_eclipse_lunar -> check() )
         {
-          p -> buffs_eclipse_solar -> trigger();
+          if ( p -> buffs_eclipse_solar -> trigger() )
+            p -> buffs_eclipse_lunar -> cooldown_ready = sim -> current_time + 15;
         }
       }
       if ( p -> glyphs.starfire )
@@ -3049,7 +3032,8 @@ struct wrath_t : public druid_spell_t
         trigger_t10_4pc_caster( player, travel_dmg, SCHOOL_NATURE );
         if( ! p -> buffs_eclipse_solar -> check() )
         {
-          p -> buffs_eclipse_lunar -> trigger();
+          if ( p -> buffs_eclipse_lunar -> trigger() )
+            p -> buffs_eclipse_solar -> cooldown_ready = sim -> current_time + 15;
         }
       }
       trigger_earth_and_moon( this );
@@ -3128,20 +3112,16 @@ struct starfall_t : public druid_spell_t
 
         static rank_t ranks[] =
         {
-          { 80, 4,  78,  78, 0, 0 },
-          { 75, 3,  66,  66, 0, 0 },
-          { 70, 2,  45,  45, 0, 0 },
-          { 60, 1,  20,  20, 0, 0 },
+          { 80, 4, 101, 101, 0, 0 },
+          { 75, 3,  84,  85, 0, 0 },
+          { 70, 2,  57,  58, 0, 0 },
+          { 60, 1,  25,  26, 0, 0 },
           {  0, 0,   0,   0, 0, 0 }
         };
 
         init_rank( ranks );
-        direct_power_mod  = 0.012;
-        if ( p -> sim -> P333 )
-        {
-          base_dd_min = base_dd_max = 101;
-          direct_power_mod  = 0.13;
-        }
+        direct_power_mod  = 0.13;
+
         may_crit          = true;
         may_miss          = true;
         may_resist        = true;
@@ -3151,8 +3131,7 @@ struct starfall_t : public druid_spell_t
 
         base_crit                  += util_t::talent_rank( p -> talents.natures_majesty, 2, 0.02 );
         base_crit_bonus_multiplier *= 1.0 + util_t::talent_rank( p -> talents.vengeance, 5, 0.20 );
-        if ( p -> glyphs.focus )
-          base_multiplier *= ( p -> sim -> P333 ? 1.1 : 1.2 );
+        if ( p -> glyphs.focus ) base_multiplier *= 1.1;
         id = 53190;
       }
       virtual void execute()
@@ -3170,14 +3149,13 @@ struct starfall_t : public druid_spell_t
       {
         druid_t* p = player -> cast_druid();
 
-        direct_power_mod  = 0.046;
-        if ( p -> sim -> P333 ) direct_power_mod = 0.37;
-        may_crit          = true;
-        may_miss          = true;
-        may_resist        = true;
-        background        = true;
-        proc              = true;
-        dual              = true;
+        direct_power_mod = 0.30;
+        may_crit         = true;
+        may_miss         = true;
+        may_resist       = true;
+        background       = true;
+        proc             = true;
+        dual             = true;
 
         base_dd_min = base_dd_max  = 0;
         base_crit                  += util_t::talent_rank( p -> talents.natures_majesty, 2, 0.02 );
@@ -3214,18 +3192,13 @@ struct starfall_t : public druid_spell_t
 
     static rank_t ranks[] =
     {
-      { 80, 4, 433, 503, 0, 0.39 },
-      { 75, 3, 366, 424, 0, 0.39 },
-      { 70, 2, 250, 290, 0, 0.39 },
-      { 60, 1, 111, 129, 0, 0.39 },
+      { 80, 4, 563, 653, 0, 0.35 },
+      { 75, 3, 474, 551, 0, 0.35 },
+      { 70, 2, 324, 377, 0, 0.35 },
+      { 60, 1, 114, 167, 0, 0.35 },
       { 0, 0, 0, 0, 0, 0 }
     };
     init_rank( ranks );
-    if ( p -> sim -> P333 )
-    {
-      base_dd_min = 563;
-      base_dd_max = 653;
-    }
 
     num_ticks      = 10;
     base_tick_time = 1.0;
@@ -3271,11 +3244,11 @@ struct typhoon_t : public druid_spell_t
 
     static rank_t ranks[] =
     {
-      { 80, 5, 1190, 1190, 0, 0.32 },
-      { 75, 4, 1010, 1010, 0, 0.32 },
-      { 70, 3,  735,  735, 0, 0.32 },
-      { 60, 2,  550,  550, 0, 0.32 },
-      { 50, 1,  400,  400, 0, 0.32 },
+      { 80, 5, 1190, 1190, 0, 0.25 },
+      { 75, 4, 1010, 1010, 0, 0.25 },
+      { 70, 3,  735,  735, 0, 0.25 },
+      { 60, 2,  550,  550, 0, 0.25 },
+      { 50, 1,  400,  400, 0, 0.25 },
       {  0, 0,    0,    0, 0, 0 }
     };
     init_rank( ranks );
@@ -3284,7 +3257,6 @@ struct typhoon_t : public druid_spell_t
     direct_power_mod  = 0.193;
     base_multiplier *= 1.0 + 0.15 * p -> talents.gale_winds;
     aoe = true;
-    if ( p -> sim -> P333) base_cost = p -> resource_base[ RESOURCE_MANA ] * 0.25;
 
     cooldown -> duration = 20;
     if ( p -> glyphs.monsoon )
@@ -3519,7 +3491,10 @@ void druid_t::init_glyphs()
     else if ( n == "unburdened_rebirth"    ) ;
     else if ( n == "wild_growth"           ) ;
     else if ( n == "wrath"                 ) ;
-    else if ( ! sim -> parent ) util_t::fprintf( sim -> output_file, "simulationcraft: Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    else if ( ! sim -> parent ) 
+    {
+      sim -> errorf( "Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    }
   }
 }
 
@@ -3676,7 +3651,7 @@ void druid_t::init_items()
   else if ( idol == "harolds_rejuvenating_broach"  ) ;
   else
   {
-    log_t::output( sim, "simulationcraft: %s has unknown idol %s", name(), idol.c_str() );
+    sim -> errorf( "Player %s has unknown idol %s", name(), idol.c_str() );
   }
 
   if ( idols.raven_goddess ) gear.add_stat( STAT_CRIT_RATING, 40 );
@@ -3689,6 +3664,8 @@ void druid_t::init_scaling()
   player_t::init_scaling();
 
   equipped_weapon_dps = main_hand_weapon.damage / main_hand_weapon.swing_time;
+
+  scales_with[ STAT_WEAPON_SPEED  ] = 0;
 }
 
 // druid_t::init_gains ======================================================
@@ -3749,7 +3726,7 @@ void druid_t::init_actions()
 {
   if ( primary_role() == ROLE_ATTACK && main_hand_weapon.type == WEAPON_NONE )
   {
-    log_t::output( sim, "Player %s has no weapon equipped at the Main-Hand slot.", name() );
+    sim -> errorf( "Player %s has no weapon equipped at the Main-Hand slot.", name() );
     quiet = true;
     return;
   }
@@ -3789,25 +3766,29 @@ void druid_t::init_actions()
         action_list_str += "flask,type=endless_rage";
         action_list_str += "/food,type=hearty_rhino";
         action_list_str += "/cat_form";
+        action_list_str += "/speed_potion,if=!in_combat|buff.bloodlust.react";
         action_list_str += "/auto_attack";
         action_list_str += "/snapshot_stats";
         action_list_str += "/maim";
         action_list_str += "/faerie_fire_feral,debuff_only=1";
-        action_list_str += "/tigers_fury,energy<=40,berserk=0";
-        if ( talents.berserk )action_list_str += "/berserk_cat,energy>=70,energy<=90";
-        action_list_str += "/savage_roar,cp>=1,savage_roar<=1";
-        action_list_str += "/savage_roar,cp>=5,savage_roar<=6,rip>=6";
-        if ( glyphs.shred )action_list_str += "/shred,extend_rip=1,rip<=4";
-        action_list_str += "/rip,cp>=5,time_to_die>=6";
-        action_list_str += "/ferocious_bite,cp>=5,time_to_die<=6";
-        action_list_str += "/ferocious_bite,cp>=5,rip>=10";
+        action_list_str += "/tigers_fury,energy<=30,if=!buff.berserk.up";
+        if ( talents.berserk )action_list_str += "/berserk_cat,energy>=80,energy<=90";
+        action_list_str += "/savage_roar,if=buff.combo_points.stack>=1&buff.savage_roar.remains<=1";
+        action_list_str += "/savage_roar,if=buff.combo_points.stack>=3&dot.rip.remains-buff.savage_roar.remains>=0&buff.savage_roar.remains<=8";
+        action_list_str += "/savage_roar,if=buff.combo_points.stack>=3&buff.savage_roar.remains-dot.rip.remains<=3&buff.savage_roar.remains<=8";
+        if ( glyphs.shred )action_list_str += "/shred,extend_rip=1,if=dot.rip.remains<=4";
+        action_list_str += "/rip,time_to_die>=6,if=buff.combo_points.stack>=5";
+        action_list_str += "/ferocious_bite,time_to_die<=6,if=buff.combo_points.stack>=5";
+        action_list_str += "/ferocious_bite,if=buff.combo_points.stack>=5&dot.rip.remains>=8&buff.savage_roar.remains>=11";
         if ( talents.mangle ) action_list_str += "/mangle_cat,mangle<=1";
         action_list_str += "/rake,time_to_die>=9";
-        action_list_str += "/shred,energy>=70";
-        action_list_str += "/shred,omen_of_clarity=1";
-        action_list_str += "/shred,cp<=4,rip<=3";
+        action_list_str += "/shred,energy>=80";
+        action_list_str += "/shred,if=buff.omen_of_clarity.react";
+        action_list_str += "/shred,if=buff.combo_points.stack<=4&dot.rip.remains<=3";
         action_list_str += "/shred,time_to_die<=9";
-        action_list_str += "/shred,berserk=1";
+        action_list_str += "/shred,if=buff.berserk.up";
+        action_list_str += "/shred,if=cooldown.tigers_fury.remains<=3";
+        action_list_str += "/shred,if=buff.combo_points.stack<=0&buff.savage_roar.remains<=2";
       }
     }
     else
@@ -3815,12 +3796,16 @@ void druid_t::init_actions()
       action_list_str += "flask,type=frost_wyrm/food,type=fish_feast/mark_of_the_wild";
       if ( talents.moonkin_form ) action_list_str += "/moonkin_form";
       action_list_str += "/snapshot_stats";
+      action_list_str += "/speed_potion,if=!in_combat|(buff.bloodlust.react&buff.lunar_eclipse.react)";
       if ( talents.improved_faerie_fire ) action_list_str += "/faerie_fire";
       if ( talents.typhoon ) action_list_str += "/typhoon,moving=1";
-      action_list_str += "/speed_potion";
       action_list_str += "/innervate,trigger=-2000";
-      if ( talents.force_of_nature ) action_list_str+="/treants";
-      if ( talents.starfall        ) action_list_str+="/starfall,if=!eclipse";
+      if ( talents.force_of_nature )
+      {
+        action_list_str+="/treants,time<=60";
+        action_list_str+="/treants,if=buff.bloodlust.react";
+      }
+      if ( talents.starfall ) action_list_str+="/starfall,if=!eclipse";
       action_list_str += "/starfire,if=buff.t8_4pc_caster.up";
       action_list_str += "/moonfire,if=!ticking";
       if ( talents.insect_swarm ) action_list_str += "/insect_swarm,if=!ticking";
@@ -4345,7 +4330,7 @@ void player_t::druid_init( sim_t* sim )
   t -> debuffs.improved_faerie_fire = new debuff_t( sim, "improved_faerie_fire", 1, 300.0 );
   t -> debuffs.infected_wounds      = new debuff_t( sim, "infected_wounds",      1,  12.0 );
   t -> debuffs.insect_swarm         = new debuff_t( sim, "insect_swarm",         1,  12.0 );
-  t -> debuffs.mangle               = new debuff_t( sim, "mangle",               1,  ( sim -> P333 ? 60.0 : 12.0 ) );
+  t -> debuffs.mangle               = new debuff_t( sim, "mangle",               1,  60.0 );
 }
 
 // player_t::druid_combat_begin =============================================

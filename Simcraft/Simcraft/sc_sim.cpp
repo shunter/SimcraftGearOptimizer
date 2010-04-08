@@ -80,7 +80,7 @@ static bool parse_patch( sim_t*             sim,
 
   if ( 3 != util_t::string_split( value, ".", "i i i", &arch, &version, &revision ) )
   {
-    util_t::fprintf( sim -> output_file, "simulationcraft: Expected format: -patch=#.#.#\n" );
+    sim -> errorf( "Expected format: -patch=#.#.#\n" );
     return false;
   }
 
@@ -117,7 +117,7 @@ static bool parse_active( sim_t*             sim,
     }
     if ( ! sim -> active_player )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Unable to find player %s\n", value.c_str() );
+      sim -> errorf( "Unable to find player %s to make active.\n", value.c_str() );
       return false;
     }
   }
@@ -185,9 +185,8 @@ static bool parse_player( sim_t*             sim,
 
       if ( sim -> active_player )
         if ( player_name != sim -> active_player -> name() )
-          util_t::fprintf( sim -> output_file,
-			   "simulationcraft: Warning! Mismatch between player name '%s' and wowhead name '%s' for id '%s'\n",
-                          player_name.c_str(), sim -> active_player -> name(), wowhead.c_str() );
+          sim -> errorf( "Mismatch between player name '%s' and wowhead name '%s' for id '%s'\n",
+			 player_name.c_str(), sim -> active_player -> name(), wowhead.c_str() );
 
     }
   }
@@ -212,7 +211,7 @@ static bool parse_armory( sim_t*             sim,
 
     if ( num_splits < 3 )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Expected format is: armory=region,server,player1,player2,...\n" );
+      sim -> errorf( "Expected format is: armory=region,server,player1,player2,...\n" );
       return false;
     }
 
@@ -303,7 +302,7 @@ static bool parse_wowhead( sim_t*             sim,
   if ( name == "wowhead" )
   {
     std::vector<std::string> splits;
-    int num_splits = util_t::string_split( splits, value, "," );
+    int num_splits = util_t::string_split( splits, value, ",." );
 
     if ( num_splits == 1 )
     {
@@ -336,7 +335,7 @@ static bool parse_wowhead( sim_t*             sim,
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Expected format is: wowhead=id OR wowhead=region,server,player1,player2,...\n" );
+      sim -> errorf( "Expected format is: wowhead=id OR wowhead=region,server,player1,player2,...\n" );
       return false;
     }
   }
@@ -355,7 +354,7 @@ static bool parse_rawr( sim_t*             sim,
     sim -> active_player = rawr_t::load_player( sim, value );
     if ( ! sim -> active_player )
     {
-      util_t::fprintf( sim -> output_file, "\nsimulationcraft: Unable to parse Rawr Character Save file '%s'\n", value.c_str() );
+      sim -> errorf( "Unable to parse Rawr Character Save file '%s'\n", value.c_str() );
     }
   }
 
@@ -371,7 +370,7 @@ static bool parse_rawr( sim_t*             sim,
 // sim_t::sim_t =============================================================
 
 sim_t::sim_t( sim_t* p, int index ) :
-    parent( p ), P333( false ), P400( false ),
+    parent( p ), P400( false ),
     free_list( 0 ), player_list( 0 ), active_player( 0 ), num_players( 0 ), canceled( 0 ),
     queue_lag( 0.075 ), queue_lag_stddev( 0 ),
     gcd_lag( 0.150 ), gcd_lag_stddev( 0 ),
@@ -384,6 +383,7 @@ sim_t::sim_t( sim_t* p, int index ) :
     seed( 0 ), id( 0 ), iterations( 1000 ), current_iteration( -1 ), current_slot( -1 ),
     armor_update_interval( 20 ), weapon_speed_scale_factors( 0 ),
     optimal_raid( 0 ), spell_crit_suppression( 0 ), log( 0 ), debug( 0 ), save_profiles( 0 ),
+    normalized_stat( STAT_NONE ),
     default_region_str( "us" ),
     rng( 0 ), deterministic_rng( 0 ), rng_list( 0 ),
     smooth_rng( 0 ), deterministic_roll( 0 ), average_range( 1 ), average_gauss( 0 ),
@@ -428,6 +428,8 @@ sim_t::sim_t( sim_t* p, int index ) :
 
     // Inherit 'plot' settings from parent because are set outside of the config file
     enchant = parent -> enchant;
+
+    seed = parent -> seed;
   }
 }
 
@@ -707,6 +709,10 @@ void sim_t::combat_end()
 
 bool sim_t::init()
 {
+  if ( seed == 0 ) seed = ( int ) time( NULL );
+
+  if( ! parent ) srand( seed );
+
   rng = rng_t::create( this, "global", RNG_MERSENNE_TWISTER );
 
   deterministic_rng = rng_t::create( this, "global_deterministic", RNG_MERSENNE_TWISTER );
@@ -720,7 +726,6 @@ bool sim_t::init()
     deterministic_roll = 1;
   }
 
-  P333 = patch.after( 3, 3, 3 );
   P400 = patch.after( 4, 0, 0 );
 
   // Timing wheel depth defaults to 10 minutes with a granularity of 10 buckets per second.
@@ -1220,6 +1225,7 @@ void sim_t::use_optimal_buffs_and_debuffs( int value )
   overrides.fortitude              = optimal_raid;
   overrides.frost_fever            = optimal_raid;
   overrides.heart_of_the_crusader  = optimal_raid;
+  overrides.hellscreams_warsong    = 0;
   overrides.heroic_presence        = optimal_raid;
   overrides.horn_of_winter         = optimal_raid;
   overrides.hunters_mark           = optimal_raid;
@@ -1246,6 +1252,7 @@ void sim_t::use_optimal_buffs_and_debuffs( int value )
   overrides.savage_combat          = optimal_raid;
   overrides.scorpid_sting          = optimal_raid;
   overrides.strength_of_earth      = optimal_raid;
+  overrides.strength_of_wrynn      = 0;
   overrides.sunder_armor           = optimal_raid;
   overrides.swift_retribution      = optimal_raid;
   overrides.trauma                 = optimal_raid;
@@ -1508,6 +1515,7 @@ std::vector<option_t>& sim_t::get_options()
       { "override.frost_fever",             OPT_BOOL,   &( overrides.frost_fever                    ) },
       { "override.heart_of_the_crusader",   OPT_BOOL,   &( overrides.heart_of_the_crusader          ) },
       { "override.horn_of_winter",          OPT_BOOL,   &( overrides.horn_of_winter                 ) },
+      { "override.hellscreams_warsong",     OPT_BOOL,   &( overrides.hellscreams_warsong            ) },
       { "override.heroic_presence",         OPT_BOOL,   &( overrides.heroic_presence                ) },
       { "override.hunters_mark",            OPT_BOOL,   &( overrides.hunters_mark                   ) },
       { "override.improved_faerie_fire",    OPT_BOOL,   &( overrides.improved_faerie_fire           ) },
@@ -1533,6 +1541,7 @@ std::vector<option_t>& sim_t::get_options()
       { "override.savage_combat",           OPT_BOOL,   &( overrides.savage_combat                  ) },
       { "override.scorpid_sting",           OPT_BOOL,   &( overrides.scorpid_sting                  ) },
       { "override.strength_of_earth",       OPT_BOOL,   &( overrides.strength_of_earth              ) },
+      { "override.strength_of_wrynn",       OPT_BOOL,   &( overrides.strength_of_wrynn              ) },
       { "override.sunder_armor",            OPT_BOOL,   &( overrides.sunder_armor                   ) },
       { "override.swift_retribution",       OPT_BOOL,   &( overrides.swift_retribution              ) },
       { "override.thunder_clap",            OPT_BOOL,   &( overrides.thunder_clap                   ) },
@@ -1671,11 +1680,15 @@ bool sim_t::parse_options( int    _argc,
   }
   else if ( ! output_file_str.empty() )
   {
-    output_file = fopen( output_file_str.c_str(), "w" );
-    if ( ! output_file )
+    FILE* f = fopen( output_file_str.c_str(), "w" );
+    if ( f )
     {
-      util_t::fprintf( output_file, "simulationcraft: Unable to open output file '%s'\n", output_file_str.c_str() );
-      exit( 0 );
+      output_file = f;
+    }
+    else
+    {
+      errorf( "Unable to open output file '%s'\n", output_file_str.c_str() );
+      cancel();
     }
   }
   if ( ! log_file_str.empty() )
@@ -1683,8 +1696,8 @@ bool sim_t::parse_options( int    _argc,
     log_file = fopen( log_file_str.c_str(), "w" );
     if ( ! log_file )
     {
-      util_t::fprintf( output_file, "simulationcraft: Unable to open combat log file '%s'\n", log_file_str.c_str() );
-      exit( 0 );
+      errorf( "Unable to open combat log file '%s'\n", log_file_str.c_str() );
+      cancel();
     }
     log = 1;
   }
@@ -1710,11 +1723,11 @@ void sim_t::cancel()
 
   if( current_iteration >= 0 ) 
   {
-    util_t::fprintf( output_file, "\nSimulation has been canceled after %d iterations! (thread=%d)\n", current_iteration+1, thread_index );
+    errorf( "Simulation has been canceled after %d iterations! (thread=%d)\n", current_iteration+1, thread_index );
   }
   else
   {
-    util_t::fprintf( output_file, "\nSimulation has been canceled during player setup! (thread=%d)\n", thread_index );
+    errorf( "Simulation has been canceled during player setup! (thread=%d)\n", thread_index );
   }
   fflush( output_file );
 
@@ -1775,14 +1788,13 @@ int sim_t::main( int argc, char** argv )
 
   if ( ! parse_options( argc, argv ) )
   {
-    util_t::fprintf( output_file, "simulationcraft: ERROR! Incorrect option format..\n" );
-    exit( 0 );
+    errorf( "ERROR! Incorrect option format..\n" );
+    cancel();
   }
 
-  current_throttle = armory_throttle;
+  if( canceled ) return 0;
 
-  if ( seed == 0 ) seed = ( int ) time( NULL );
-  srand( seed );
+  current_throttle = armory_throttle;
 
   patch.decode(&arch, &version, &revision);
   util_t::fprintf( output_file,
@@ -1823,6 +1835,42 @@ int sim_t::main( int argc, char** argv )
   sim_signal_handler_t::init( 0 );
 
   return 0;
+}
+
+// sim_t::errorf ============================================================
+
+int sim_t::errorf( const char* format, ... )
+{
+  va_list fmtargs;
+  int retcode = 0;
+  char *p_locale = NULL;
+  char buffer_locale[ 1024 ];
+  char buffer_printf[ 1024 ];
+
+  p_locale = setlocale( LC_CTYPE, NULL );
+  if ( p_locale != NULL )
+  {
+    strncpy( buffer_locale, p_locale, 1023 );
+    buffer_locale[1023] = '\0';
+  }
+  else
+  {
+    buffer_locale[0] = '\0';
+  }
+
+  setlocale( LC_CTYPE, "" );
+
+  va_start( fmtargs, format );
+  retcode = vsnprintf( buffer_printf, 1023, format, fmtargs );
+  va_end( fmtargs );
+
+  fprintf( output_file, "%s", buffer_printf );
+  fprintf( output_file, "\n" );
+  error_list.push_back( buffer_printf );
+
+  setlocale( LC_CTYPE, p_locale );
+
+  return retcode;
 }
 
 // ==========================================================================

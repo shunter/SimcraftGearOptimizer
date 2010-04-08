@@ -403,7 +403,18 @@ bool http_t::download( std::string& result,
   }
 
   char buffer[2048];
-  sprintf( buffer, "GET %s HTTP/1.0\r\nUser-Agent: Firefox/3.0\r\nAccept: */*\r\nHost: %s\r\nCookie: loginChecked=1\r\nConnection: close\r\n\r\n", path.c_str(), host.c_str() );
+  sprintf( buffer, 
+	   "GET %s HTTP/1.0\r\n"
+	   "User-Agent: Firefox/3.0\r\n"
+	   "Accept: */*\r\n"
+	   "Host: %s\r\n"
+	   "Cookie: loginChecked=1\r\n"
+	   "Cookie: cookieLangId=en_US\r\n"
+	   "Connection: close\r\n"
+	   "\r\n", 
+	   path.c_str(), 
+	   host.c_str() );
+
   r = ::send( s, buffer, int( strlen( buffer ) ), 0 );
   if ( r != ( int ) strlen( buffer ) )
   {
@@ -460,7 +471,12 @@ bool http_t::download( std::string& result,
   {
     std::wstring wURL( url.length(), L' ' );
     std::copy( url.begin(), url.end(), wURL.begin() );
-    hFile = InternetOpenUrl( hINet, wURL.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0 );
+
+    std::wstring wHeaders = L"";
+    wHeaders += L"Cookie: loginChecked=1\r\n";
+	  wHeaders += L"Cookie: cookieLangId=en_US\r\n";
+
+    hFile = InternetOpenUrl( hINet, wURL.c_str(), wHeaders.c_str(), 0, INTERNET_FLAG_RELOAD, 0 );
     if ( hFile )
     {
       char buffer[ 20000 ];
@@ -523,7 +539,18 @@ bool http_t::download( std::string& result,
   }
 
   char buffer[2048];
-  sprintf( buffer, "GET %s HTTP/1.0\r\nUser-Agent: Firefox/3.0\r\nAccept: */*\r\nHost: %s\r\nCookie: loginChecked=1\r\nConnection: close\r\n\r\n", path.c_str(), host.c_str() );
+  sprintf( buffer, 
+	   "GET %s HTTP/1.0\r\n"
+	   "User-Agent: Firefox/3.0\r\n"
+	   "Accept: */*\r\n"
+	   "Host: %s\r\n"
+	   "Cookie: loginChecked=1\r\n"
+	   "Cookie: cookieLangId=en_US\r\n"
+	   "Connection: close\r\n"
+	   "\r\n", 
+	   path.c_str(), 
+	   host.c_str() );
+
   r = ::send( s, buffer, int( strlen( buffer ) ), MSG_WAITALL );
   if ( r != ( int ) strlen( buffer ) )
   {

@@ -100,7 +100,7 @@ static int parse_meta_gem( const std::string& prefix,
 // item_t::item_t ===========================================================
 
 item_t::item_t( player_t* p, const std::string& o ) :
-    sim(p->sim), player(p), slot(SLOT_NONE), unique(false), unique_enchant(false), options_str(o)
+    sim(p->sim), player(p), slot(SLOT_NONE), unique(false), unique_enchant(false), is_heroic( false ), options_str(o)
 {
 }
 
@@ -111,6 +111,14 @@ bool item_t::active() SC_CONST
   if ( slot == SLOT_NONE ) return false;
   if ( ! encoded_name_str.empty() ) return true;
   return false;
+}
+
+// item_t::heroic ===========================================================
+
+bool item_t::heroic() SC_CONST
+{
+  if ( slot == SLOT_NONE ) return false;
+  return is_heroic;
 }
 
 // item_t::name =============================================================
@@ -165,6 +173,7 @@ bool item_t::parse_options()
     { "equip",   OPT_STRING, &option_equip_str   },
     { "use",     OPT_STRING, &option_use_str     },
     { "weapon",  OPT_STRING, &option_weapon_str  },
+    { "heroic",  OPT_STRING, &option_heroic_str  },
     { NULL, OPT_UNKNOWN, NULL }
   };
 
@@ -178,6 +187,7 @@ bool item_t::parse_options()
   armory_t::format( option_equip_str   );
   armory_t::format( option_use_str     );
   armory_t::format( option_weapon_str  );
+  armory_t::format( option_heroic_str  );
 
   return true;
 }
@@ -192,6 +202,7 @@ void item_t::encode_options()
 
   o = encoded_name_str;
 
+  if ( heroic() )                      { o += ",heroic=1";                           }
   if ( ! encoded_stats_str.empty()   ) { o += ",stats=";   o += encoded_stats_str;   }
   if ( ! encoded_gems_str.empty()    ) { o += ",gems=";    o += encoded_gems_str;    }
   if ( ! encoded_enchant_str.empty() ) { o += ",enchant="; o += encoded_enchant_str; }
@@ -219,31 +230,42 @@ bool item_t::init()
 
     if ( encoded_name_str != armory_name_str )
     {
-      util_t::fprintf( sim -> output_file, "\nsimulationcraft: Warning! Player %s at slot %s has inconsistency between name '%s' and '%s' for id '%s'\n",
-                      player -> name(), slot_name(), option_name_str.c_str(), armory_name_str.c_str(), option_id_str.c_str() );
+      sim -> errorf( "Player %s at slot %s has inconsistency between name '%s' and '%s' for id '%s'\n",
+		     player -> name(), slot_name(), option_name_str.c_str(), armory_name_str.c_str(), option_id_str.c_str() );
 
       encoded_name_str = armory_name_str;
     }
   }
 
-  id_str              = armory_id_str;
-  encoded_stats_str   = armory_stats_str;
-  encoded_gems_str    = armory_gems_str;
-  encoded_enchant_str = armory_enchant_str;
-  encoded_weapon_str  = armory_weapon_str;
+  if( encoded_name_str != "empty" &&
+      encoded_name_str != "none" )
+  {
+    id_str              = armory_id_str;
+    encoded_stats_str   = armory_stats_str;
+    encoded_gems_str    = armory_gems_str;
+    encoded_enchant_str = armory_enchant_str;
+    encoded_weapon_str  = armory_weapon_str;
+    encoded_heroic_str  = armory_heroic_str;
+  }
 
-  unique_gear_t::get_equip_encoding( encoded_equip_str, encoded_name_str, id_str );
-  unique_gear_t::get_use_encoding  ( encoded_use_str,   encoded_name_str, id_str );
+  if ( ! option_heroic_str.empty()  ) encoded_heroic_str  = option_heroic_str;
+
+  if ( ! decode_heroic()  ) return false;
+
+  unique_gear_t::get_equip_encoding( encoded_equip_str, encoded_name_str, heroic(), id_str );
+  unique_gear_t::get_use_encoding  ( encoded_use_str,   encoded_name_str, heroic(), id_str );
 
   if ( ! option_stats_str.empty()   ) encoded_stats_str   = option_stats_str;
   if ( ! option_gems_str.empty()    ) encoded_gems_str    = option_gems_str;
   if ( ! option_enchant_str.empty() ) encoded_enchant_str = option_enchant_str;
   if ( ! option_weapon_str.empty()  ) encoded_weapon_str  = option_weapon_str;
 
+
   if ( ! decode_stats()   ) return false;
   if ( ! decode_gems()    ) return false;
   if ( ! decode_enchant() ) return false;
   if ( ! decode_weapon()  ) return false;
+  if ( ! decode_heroic()  ) return false;
 
   if ( ! option_equip_str.empty() ) encoded_equip_str = option_equip_str;
   if ( ! option_use_str.empty()   ) encoded_use_str   = option_use_str;
@@ -256,10 +278,21 @@ bool item_t::init()
   return true;
 }
 
+// item_t::decode_heroic ====================================================
+
+bool item_t::decode_heroic()
+{
+  is_heroic = ! ( encoded_heroic_str.empty() || ( encoded_heroic_str == "0" ) || ( encoded_heroic_str == "no" ) );
+
+  return true;
+}
+
 // item_t::decode_stats =====================================================
 
 bool item_t::decode_stats()
 {
+  if ( encoded_stats_str == "none" ) return true;
+
   std::vector<token_t> tokens;
   int num_tokens = parse_tokens( tokens, encoded_stats_str );
 
@@ -291,7 +324,7 @@ bool item_t::decode_stats()
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: %s has unknown 'stats=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
+      sim -> errorf( "Player %s has unknown 'stats=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
       return false;
     }
   }
@@ -303,6 +336,8 @@ bool item_t::decode_stats()
 
 bool item_t::decode_gems()
 {
+  if ( encoded_gems_str == "none" ) return true;
+
   std::vector<token_t> tokens;
   int num_tokens = parse_tokens( tokens, encoded_gems_str );
 
@@ -327,7 +362,7 @@ bool item_t::decode_gems()
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "\nsimulationcraft: %s has unknown 'gems=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
+      sim -> errorf( "Player %s has unknown 'gems=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
       //return false;
     }
   }
@@ -346,6 +381,8 @@ bool item_t::decode_gems()
 
 bool item_t::decode_enchant()
 {
+  if ( encoded_enchant_str == "none" ) return true;
+
   if( encoded_enchant_str == "berserking"  ||
       encoded_enchant_str == "executioner" ||
       encoded_enchant_str == "mongoose"    ||
@@ -356,7 +393,7 @@ bool item_t::decode_enchant()
   }
 
   std::string hidden_str;
-  if( unique_gear_t::get_hidden_encoding( hidden_str, encoded_enchant_str ) )
+  if( unique_gear_t::get_hidden_encoding( hidden_str, encoded_enchant_str, heroic() ) )
   {
     std::vector<token_t> tokens;
     int num_tokens = parse_tokens( tokens, hidden_str );
@@ -372,7 +409,7 @@ bool item_t::decode_enchant()
       }
       else
       {
-        util_t::fprintf( sim -> output_file, "simulationcraft: %s has unknown 'enchant=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
+        sim -> errorf( "Player %s has unknown 'enchant=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
         return false;
       }
     }
@@ -381,7 +418,7 @@ bool item_t::decode_enchant()
   }
 
   std::string use_str;
-  if( unique_gear_t::get_use_encoding( use_str, encoded_enchant_str ) )
+  if( unique_gear_t::get_use_encoding( use_str, encoded_enchant_str, heroic() ) )
   {
     unique_enchant = true;
     use.name_str = encoded_enchant_str;
@@ -389,7 +426,7 @@ bool item_t::decode_enchant()
   }
 
   std::string equip_str;
-  if( unique_gear_t::get_equip_encoding( equip_str, encoded_enchant_str ) )
+  if( unique_gear_t::get_equip_encoding( equip_str, encoded_enchant_str, heroic() ) )
   {
     unique_enchant = true;
     enchant.name_str = encoded_enchant_str;
@@ -410,7 +447,7 @@ bool item_t::decode_enchant()
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: %s has unknown 'enchant=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
+      sim -> errorf( "Player %s has unknown 'enchant=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
       return false;
     }
   }
@@ -423,7 +460,7 @@ bool item_t::decode_enchant()
 bool item_t::decode_special( special_effect_t& effect,
                              const std::string& encoding )
 {
-  if ( encoding == "custom" ) return true;
+  if ( encoding == "custom" || encoding == "none" ) return true;
 
   std::vector<token_t> tokens;
   int num_tokens = parse_tokens( tokens, encoding );
@@ -700,7 +737,7 @@ bool item_t::decode_special( special_effect_t& effect,
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: %s has unknown 'use/equip=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
+      sim -> errorf( "Player %s has unknown 'use/equip=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
       return false;
     }
   }
@@ -786,7 +823,7 @@ bool item_t::decode_weapon()
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: %s has unknown 'weapon=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
+      sim -> errorf( "Player %s has unknown 'weapon=' token '%s' at slot %s\n", player -> name(), t.full.c_str(), slot_name() );
       return false;
     }
   }
@@ -822,18 +859,16 @@ bool item_t::download_slot( item_t& item, const std::string& item_id, const std:
 
   if ( ! success )
   {
-    util_t::fprintf( item.sim -> output_file,
-                     "\nsimulationcraft: Player %s unable to download slot '%s' info from wowhead.  Trying mmo-champion....\n", 
-                     p -> name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to download slot '%s' info from wowhead.  Trying mmo-champion....\n", 
+			p -> name(), item.slot_name() );
 
     success = mmo_champion_t::download_slot( item, item_id, enchant_id, gem_ids, 0 );
   }
 
   if ( ! success )
   {
-    util_t::fprintf( item.sim -> output_file, 
-                     "\nsimulationcraft: Player %s unable to download slot '%s' info from mmo-champion.  Trying wowarmory....\n", 
-                     p -> name(), item.slot_name() );
+    item.sim -> errorf( "Player %s unable to download slot '%s' info from mmo-champion.  Trying wowarmory....\n", 
+			p -> name(), item.slot_name() );
 
     success = armory_t::download_slot( item, item_id, 0 );
   }
@@ -859,17 +894,15 @@ bool item_t::download_item( item_t& item, const std::string& item_id )
   }
   if ( ! success )
   {
-    util_t::fprintf( item.sim -> output_file,
-                     "\nsimulationcraft: Player %s unable to download item '%s' info from mmo-champion.  Trying wowhead....\n", 
-                     p -> name(), item.name() );
+    item.sim -> errorf( "Player %s unable to download item '%s' info from mmo-champion.  Trying wowhead....\n", 
+			p -> name(), item.name() );
 
     success = wowhead_t::download_item( item, item_id, 0 );
   }
   if ( ! success )
   {
-    util_t::fprintf( item.sim -> output_file, 
-                     "\nsimulationcraft: Player %s unable to download item '%s' info from mmo-champion.  Trying wowarmory....\n", 
-                     p -> name(), item.name() );
+    item.sim -> errorf( "Player %s unable to download item '%s' info from mmo-champion.  Trying wowarmory....\n", 
+			p -> name(), item.name() );
 
     success = armory_t::download_item( item, item_id, 0 );
   }
@@ -893,9 +926,7 @@ bool item_t::download_glyph( sim_t* sim, std::string& glyph_name, const std::str
 
   if ( ! success )
   {
-    util_t::fprintf( sim -> output_file,
-                     "\nsimulationcraft: Unable to download glyph id '%s' info from wowhead.  Trying mmo-champion....\n", 
-                     glyph_id.c_str() );
+    sim -> errorf( "Unable to download glyph id '%s' info from wowhead.  Trying mmo-champion....\n", glyph_id.c_str() );
 
     success = mmo_champion_t::download_glyph( sim, glyph_name, glyph_id, 0 );
   }
@@ -927,9 +958,7 @@ int item_t::parse_gem( item_t&            item,
   if ( gem_type != GEM_NONE )
     return gem_type;
 
-  util_t::fprintf( item.sim -> output_file,
-                   "\nsimulationcraft: Unable to download gem id '%s' info from wowhead.  Trying mmo-champion....\n", 
-                   gem_id.c_str() );
+  item.sim -> errorf( "Unable to download gem id '%s' info from wowhead.  Trying mmo-champion....\n", gem_id.c_str() );
 
   gem_type = mmo_champion_t::parse_gem( item, gem_id, 0 );
 
