@@ -397,6 +397,7 @@ struct death_knight_t : public player_t
   virtual double    composite_attack_power() SC_CONST;
   virtual double    composite_attribute_multiplier( int attr ) SC_CONST;
   virtual double    composite_spell_hit() SC_CONST;
+  virtual double    composite_player_multiplier( int school ) SC_CONST;
   virtual void      regen( double periodicity );
   virtual void      reset();
   virtual int       target_swing();
@@ -992,7 +993,7 @@ struct dancing_rune_weapon_pet_t : public pet_t
       base_crit += o -> talents.vicious_strikes * 0.03;
       base_crit_bonus_multiplier *= 1.0 + ( o -> talents.vicious_strikes * 0.15 );
       base_multiplier *= 1.0 + ( o -> talents.outbreak * 0.10
-		                       + o -> glyphs.plague_strike * 0.20 );
+                                 + o -> glyphs.plague_strike * 0.20 );
       base_multiplier *= 0.50; // DRW malus
       base_dd_min = base_dd_max = 378;
 
@@ -1101,7 +1102,7 @@ struct dancing_rune_weapon_pet_t : public pet_t
 
   virtual double composite_spell_crit() SC_CONST         { return snapshot_spell_crit;  }
   virtual double composite_attack_crit() SC_CONST        { return snapshot_attack_crit; }
-  virtual double haste()                                 { return haste_snapshot; }
+  virtual double composite_attack_haste() SC_CONST       { return haste_snapshot; }
   virtual double composite_attack_power() SC_CONST       { return attack_power; }
   virtual double composite_attack_penetration() SC_CONST { return attack_penetration; }
   virtual double composite_player_multiplier( int school ) SC_CONST
@@ -1120,7 +1121,7 @@ struct dancing_rune_weapon_pet_t : public pet_t
     snapshot_attack_crit = o -> composite_attack_crit();
     haste_snapshot       = o -> composite_attack_haste();
     attack_power         = o -> composite_attack_power() * o -> composite_attack_power_multiplier();
-	attack_penetration   = o -> composite_attack_penetration();
+    attack_penetration   = o -> composite_attack_penetration();
     drw_melee -> schedule_execute();
   }
   virtual void dismiss()
@@ -1179,7 +1180,7 @@ struct gargoyle_pet_t : public pet_t
 
     gargoyle_strike = new gargoyle_strike_t( this );
   }
-  virtual double haste() { return haste_snapshot; }
+  virtual double composite_spell_haste() SC_CONST { return haste_snapshot; }
   virtual double composite_attack_power() SC_CONST { return power_snapshot; }
 
   virtual void summon( double duration=0 )
@@ -1916,10 +1917,7 @@ void death_knight_attack_t::player_buff()
     // Does not apply to spells!
     if ( weapon -> slot == SLOT_OFF_HAND )
     {
-      if ( sim -> P333 )
-        player_multiplier *= 1.0 + p -> talents.nerves_of_cold_steel * 0.25/3.0;
-      else
-        player_multiplier *= 1.0 + p -> talents.nerves_of_cold_steel * 0.05;
+      player_multiplier *= 1.0 + p -> talents.nerves_of_cold_steel * 0.25/3.0;
     }
 
     if ( weapon -> group() == WEAPON_1H )
@@ -1932,27 +1930,30 @@ void death_knight_attack_t::player_buff()
     }
   }
 
-  // 3.3 Scourge Strike: Shadow damage is calcuted with some buffs being additive
-  // Desolation, Bone Shield, Black Ice, Blood Presence
+  // 3.3 Scourge Strike: Shadow damage is calcuted with some buffs
+  // being additive Desolation, Bone Shield, Black Ice, Blood
+  // Presence.  We divide away the multiplier as if they weren't
+  // additive then multiply by the additive multiplier to get the
+  // correct value since composite_player_multiplier will already have
+  // factored these in.
   if ( additive_factors )
   {
-    double sum_factors = 0.0;
+    std::vector<double> sum_factors;
 
-    sum_factors += p -> buffs_blood_presence -> value();
-    sum_factors += p -> buffs_bone_shield -> value();
-    sum_factors += p -> buffs_desolation -> value();
+    sum_factors.push_back( p -> buffs_blood_presence -> value() );
+    sum_factors.push_back( p -> buffs_bone_shield -> value() );
+    sum_factors.push_back( p -> buffs_desolation -> value() );
     if ( school == SCHOOL_FROST || school == SCHOOL_SHADOW )
-      sum_factors += p -> talents.black_ice * 0.02;
+      sum_factors.push_back( p -> talents.black_ice * 0.02 );
 
-    player_multiplier *= 1.0 + sum_factors;
-  }
-  else
-  {
-    player_multiplier *= 1.0 + p -> buffs_blood_presence -> value();
-    player_multiplier *= 1.0 + p -> buffs_bone_shield -> value();
-    player_multiplier *= 1.0 + p -> buffs_desolation -> value();
-    if ( school == SCHOOL_FROST || school == SCHOOL_SHADOW )
-      player_multiplier *= 1.0 + p -> talents.black_ice * 0.02;
+    double sum = 0;
+    double divisor = 1.0;
+    for ( size_t i = 0; i < sum_factors.size(); ++i )
+    {
+      sum += sum_factors[i];
+      divisor *= 1.0 + sum_factors[i];
+    }
+    player_multiplier = player_multiplier * ( 1.0 + sum ) / divisor;
   }
 
   if ( school == SCHOOL_PHYSICAL )
@@ -2061,12 +2062,6 @@ void death_knight_spell_t::player_buff()
   {
     player_multiplier *= 1.0 + p -> talents.bloody_vengeance * 0.01 * p -> buffs_bloody_vengeance -> stack();
   }
-
-  player_multiplier *= 1.0 + p -> buffs_blood_presence -> value();
-  player_multiplier *= 1.0 + p -> buffs_bone_shield -> value();
-  player_multiplier *= 1.0 + p -> buffs_desolation -> value();
-  if ( school == SCHOOL_FROST || school == SCHOOL_SHADOW )
-    player_multiplier *= 1.0 + p -> talents.black_ice * 0.02;
 
   player_multiplier *= 1.0 + p -> buffs_tier10_4pc_melee -> value();
 
@@ -2548,7 +2543,6 @@ struct death_coil_t : public death_knight_spell_t
     base_crit += p -> set_bonus.tier8_2pc_melee() * 0.08;
     base_dd_adder = 380 * p -> sigils.vengeful_heart;
 
-
     if ( sudden_doom )
     {
       proc = true;
@@ -2765,7 +2759,7 @@ struct death_strike_t : public death_knight_attack_t
       {
         player_multiplier *= 1.25;
       }
-	  else
+      else
       {
         player_multiplier *= 1 + p -> resource_current[ RESOURCE_RUNIC ] * 0.01;
       }
@@ -3377,10 +3371,7 @@ struct obliterate_t : public death_knight_attack_t
   {
     death_knight_t* p = player -> cast_death_knight();
     death_knight_attack_t::target_debuff( dmg_type );
-    if ( p -> sim -> P333 )
-      target_multiplier *= 1 + p -> diseases() * 0.125 * ( 1.0 + p -> set_bonus.tier8_4pc_melee() * .2 );
-    else
-      target_multiplier *= 1 + p -> diseases() * 0.1 * ( 1.0 + p -> set_bonus.tier8_4pc_melee() * .2 );
+    target_multiplier *= 1 + p -> diseases() * 0.125 * ( 1.0 + p -> set_bonus.tier8_4pc_melee() * .2 );
   }
 
   virtual void player_buff()
@@ -3485,7 +3476,7 @@ struct pestilence_t : public death_knight_spell_t
       if ( p -> dots_frost_fever -> ticking() )
       {
         p -> frost_fever -> refresh_duration();
-        if ( p -> sim -> P333 ) trigger_icy_talons( this );
+        trigger_icy_talons( this );
       }
     }
     p -> resource_gain( RESOURCE_RUNIC, 10, p -> gains_rune_abilities );
@@ -3522,7 +3513,7 @@ struct plague_strike_t : public death_knight_attack_t
     base_crit += p -> talents.vicious_strikes * 0.03;
     base_crit_bonus_multiplier *= 1.0 + ( p -> talents.vicious_strikes * 0.15 );
     base_multiplier *= 1.0 + ( p -> talents.outbreak * 0.10
-		                     + p -> glyphs.plague_strike * 0.20 );
+                               + p -> glyphs.plague_strike * 0.20 );
 
     weapon = &( p -> main_hand_weapon );
     normalize_weapon_speed = true;
@@ -3754,14 +3745,7 @@ struct scourge_strike_t : public death_knight_attack_t
       death_knight_attack_t::target_debuff( dmg_type );
 
       // FIX ME!! How does 4T8 play with SS in 3.3
-      if ( sim -> P333 )
-      {
-        target_multiplier *= p -> diseases() * 0.12 * ( 1.0 + p -> set_bonus.tier8_4pc_melee() * .2 );
-      }
-      else
-      {
-        target_multiplier *= p -> diseases() * 0.25 * ( 1.0 + p -> set_bonus.tier8_4pc_melee() * .2 );
-      }
+      target_multiplier *= p -> diseases() * 0.12 * ( 1.0 + p -> set_bonus.tier8_4pc_melee() * .2 );
     }
   };
   scourge_strike_t( player_t* player, const std::string& options_str  ) :
@@ -3790,7 +3774,7 @@ struct scourge_strike_t : public death_knight_attack_t
 
     scourge_strike_shadow = new scourge_strike_shadow_t( player );
 
-    weapon_multiplier        = sim -> P333 ? 0.70 : 0.50;
+    weapon_multiplier = 0.70;
     cost_frost = 1;
     cost_unholy = 1;
 
@@ -4097,26 +4081,14 @@ double death_knight_t::composite_armor() SC_CONST
 double death_knight_t::composite_attack_haste() SC_CONST
 {
   double haste = player_t::composite_attack_haste();
-  haste *= 1.0/ ( 1.0 + buffs_unholy_presence -> value() );
+  haste *= 1.0 / ( 1.0 + buffs_unholy_presence -> value() );
 
   if ( talents.improved_icy_talons )
-    haste *= 1.0/ ( 1.0 + 0.05 );
+    haste *= 1 / 1.05;
 
-  // Icy Talons give the DK 20%/20s, Imp.IT makes that buff raidwide, which
-  // are two different buff that don't stack (does not stack with WF totem)
-  // If you got 16% WF totem, 20% IT but not ITT you will gain 20% haste.
-  // I can't make up a case where you would go 5/5 IT but not take IIT.
-  if ( sim -> P333 )
-    haste *= 1.0/ ( 1.0 + buffs_icy_talons -> value() );
-  else
-  {
-    double it_haste = buffs_icy_talons -> value();
-    if ( it_haste > sim -> auras.windfury_totem -> current_value && ! sim -> auras.improved_icy_talons -> check() )
-    {
-      haste *= ( 1.0 + sim -> auras.windfury_totem -> current_value );
-      haste *= 1.0/ ( 1.0 + it_haste );
-    }
-  }
+  // Icy Talons now stacks with Windfury.
+
+  haste *= 1.0 / ( 1.0 + buffs_icy_talons -> value() );
 
   return haste;
 }
@@ -4179,11 +4151,10 @@ void death_knight_t::init_base()
   base_attack_crit                 = rating_t::get_attribute_base( sim, level, DEATH_KNIGHT, race, BASE_STAT_MELEE_CRIT );
   initial_attack_crit_per_agility  = rating_t::get_attribute_base( sim, level, DEATH_KNIGHT, race, BASE_STAT_MELEE_CRIT_PER_AGI );
 
-  double str_mult = talents.veteran_of_the_third_war * 0.02 +
-                    talents.abominations_might * 0.01 +
-                    talents.ravenous_dead * 0.01;
-  if ( sim -> P333 )
-    str_mult += talents.endless_winter * 0.02;
+  double str_mult = ( talents.veteran_of_the_third_war * 0.02 +
+                      talents.abominations_might       * 0.01 +
+                      talents.ravenous_dead            * 0.01 +
+                      talents.endless_winter           * 0.02 );
 
   attribute_multiplier_initial[ ATTR_STRENGTH ] *= 1.0 + str_mult;
   attribute_multiplier_initial[ ATTR_STAMINA ]  *= 1.0 + talents.veteran_of_the_third_war * 0.02;
@@ -4209,7 +4180,7 @@ void death_knight_t::init_actions()
 {
   if ( main_hand_weapon.type == WEAPON_NONE )
   {
-    log_t::output( sim, "Player %s has no weapon equipped at the Main-Hand slot.", name() );
+    sim -> errorf( "Player %s has no weapon equipped at the Main-Hand slot.", name() );
     quiet = true;
     return;
   }
@@ -4243,26 +4214,37 @@ void death_knight_t::init_actions()
     switch ( primary_tree() )
     {
     case TREE_BLOOD:
+      action_list_str += "/speed_potion,if=!in_combat|buff.bloodlust.react";
       action_list_str += "/auto_attack";
+      action_list_str += "/hysteria,time<=60";
       action_list_str += "/hysteria,if=buff.bloodlust.react";
-      action_list_str += "/dancing_rune_weapon,if=buff.bloodlust.react";
-      action_list_str += "/sequence,name=blood1,wait_on_ready=1";
-      action_list_str += ":icy_touch";
-      action_list_str += ":plague_strike";
-      action_list_str += ":heart_strike";
-      action_list_str += ":heart_strike";
-      action_list_str += ":death_strike";
-      action_list_str += ":raise_dead,wait_on_ready=0";
+      action_list_str += "/raise_dead,time<=60";
+      action_list_str += "/raise_dead,if=buff.bloodlust.react";
+      if ( talents.epidemic < 2 )
+      {
+        action_list_str += "/icy_touch,if=dot.frost_fever.remains<=0.1&unholy_cooldown<=2";
+        action_list_str += "/plague_strike,if=dot.blood_plague.remains<=0.1&dot.frost_fever.remains>=13";
+      }
+      else if ( glyphs.disease )
+      {
+        action_list_str += "/icy_touch,if=dot.frost_fever.remains<=0.1";
+        action_list_str += "/plague_strike,if=dot.blood_plague.remains<=0.1";
+        action_list_str += "/pestilence,if=dot.frost_fever.remains<=5|dot.blood_plague.remains<=5";
+      }
+      else
+      {
+        action_list_str += "/icy_touch,if=dot.frost_fever.remains<=2";
+        action_list_str += "/plague_strike,if=dot.blood_plague.remains<=2";
+      }
+      action_list_str += "/heart_strike";
+      action_list_str += "/death_strike";
+      if ( talents.dancing_rune_weapon )
+      {
+        action_list_str += "/dancing_rune_weapon,time<=150,if=dot.frost_fever.remains<=5|dot.blood_plague.remains<=5";
+        action_list_str += "/dancing_rune_weapon,if=(dot.frost_fever.remains<=5|dot.blood_plague.remains<=5)&buff.bloodlust.react";
+      }
+      action_list_str += "/empower_rune_weapon,if=blood=0&unholy=0&frost=0";
       action_list_str += "/death_coil";
-      action_list_str += "/sequence,name=blood2,wait_on_ready=1";
-      action_list_str += ":death_strike";
-      action_list_str += ":heart_strike";
-      action_list_str += ":heart_strike";
-      action_list_str += ":heart_strike";
-      action_list_str += ":heart_strike";
-      action_list_str += "/speed_potion";
-      action_list_str += "/restart_sequence,name=blood1";
-      action_list_str += "/restart_sequence,name=blood2";
       break;
     case TREE_FROST:
       /*Rotation:
@@ -4279,10 +4261,10 @@ void death_knight_t::init_actions()
       */
       // UA 'lags' in updating armor, so first ghoul should be a few
       // seconds after it, second ghoud then with bloodlust
+      action_list_str += "/speed_potion,if=!in_combat|buff.bloodlust.react";
       action_list_str += "/auto_attack";
-      action_list_str += "/speed_potion";
       if ( talents.unbreakable_armor )
-        action_list_str += "/unbreakable_armor,time>=10";
+        action_list_str += "/unbreakable_armor,time>=10,if=cooldown.blood_tap.remains>=58"; //Forces Unbreakable Armor to only be used in combination with Blood Tap
 
       action_list_str += "/raise_dead,time>=15,time<=40";
       action_list_str += "/raise_dead,if=buff.bloodlust.react";
@@ -4300,24 +4282,40 @@ void death_knight_t::init_actions()
       }
       if ( talents.howling_blast )
         action_list_str += "/howling_blast,if=buff.rime.react&buff.killing_machine.react";
-      if ( talents.frost_strike )
-        action_list_str += "/frost_strike,if=buff.killing_machine.react";
       if ( talents.deathchill )
         action_list_str += "/deathchill";
       action_list_str += "/obliterate";
+      // If you are using Unbreakable Armor, only use Blood Tap after you have consumed Death runes in your rotation.
+      // If not, use Blood Tap to produce an extra Obliterate once a minute.
+      if ( talents.unbreakable_armor )
+      {
+        action_list_str += "/blood_tap,time>=10,if=blood=0&frost=0&unholy=0&inactive_death=0";
+      }
+      else
+      {
+        action_list_str += "/blood_tap,if=blood=1&inactive_death=1";
+      }
       action_list_str += "/blood_strike,if=blood=2&death<=2";
       action_list_str += "/blood_strike,if=blood=1&death<=1";
       if ( talents.frost_strike )
         action_list_str += "/frost_strike";
+      action_list_str += "/empower_rune_weapon,if=blood=0&unholy=0&death=0&runic_power<75";
       if ( talents.howling_blast )
         action_list_str += "/howling_blast,if=buff.rime.react";
-      action_list_str += "/empower_rune_weapon,if=blood=0&unholy=0&death=0&runic_power<75";
-      action_list_str += "/horn_of_winter";
       break;
     case TREE_UNHOLY:
       if ( talents.bone_shield )
         action_list_str += "/bone_shield,if=!buff.bone_shield.up";
       action_list_str += "/raise_dead";
+      if ( talents.bladed_armor > 0 )
+      {
+        action_list_str += "/indestructible_potion,if=!in_combat";
+        action_list_str += "/speed_potion,if=buff.bloodlust.react";
+      }
+      else
+      {
+        action_list_str += "/speed_potion,if=!in_combat|buff.bloodlust.react";
+      }
       action_list_str += "/auto_attack";
       if ( glyphs.disease )
       {
@@ -4346,15 +4344,13 @@ void death_knight_t::init_actions()
         action_list_str += "/scourge_strike";
         action_list_str += "/blood_strike";
       }
-      action_list_str += "/speed_potion";
       if ( talents.summon_gargoyle )
       {
         action_list_str += "/summon_gargoyle,time<=20";
         action_list_str += "/summon_gargoyle,if=buff.bloodlust.react";
       }
+      action_list_str += "/empower_rune_weapon,if=blood=0&frost=0&unholy=0";
       action_list_str += "/death_coil";
-      action_list_str += "/empower_rune_weapon";
-      action_list_str += "/horn_of_winter,if=runic_power<=90";
       break;
     }
     action_list_default = 1;
@@ -4432,20 +4428,15 @@ void death_knight_t::init_enchant()
       // double PPM        = 2.0;
       // double swing_time = a -> time_to_execute;
       // double chance     = w -> proc_chance_on_swing( PPM, swing_time );
-      if ( a -> sim -> P333 )
-        buff -> trigger( 1, 0.02, 1.0 );
-      else
-        buff -> trigger( 1, 0.01, 0.30 );
+      buff -> trigger( 1, 0.02, 1.0 );
 
       razorice_damage_proc -> base_dd_min = w -> min_dmg;
       razorice_damage_proc -> base_dd_max = w -> max_dmg;
       razorice_damage_proc -> execute();
     }
   };
-  if ( sim -> P333 )
-    buffs_rune_of_razorice = new buff_t( this, "rune_of_razorice", 5,  20.0 );
-  else
-    buffs_rune_of_razorice = new buff_t( this, "rune_of_razorice", 10, 20.0 );
+
+  buffs_rune_of_razorice = new buff_t( this, "rune_of_razorice", 5,  20.0 );
 
   buffs_rune_of_the_fallen_crusader = new buff_t( this, "rune_of_the_fallen_crusader", 1, 15.0 );
   if ( mh_enchant == "rune_of_the_fallen_crusader" )
@@ -4515,7 +4506,10 @@ void death_knight_t::init_glyphs()
     else if ( n == "pestilence"          ) glyphs.pestilence = 1;
     else if ( n == "raise_dead"          ) glyphs.raise_dead = 1;
 
-    else if ( ! sim -> parent ) util_t::fprintf( sim -> output_file, "simulationcraft: Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    else if ( ! sim -> parent )
+    {
+      sim -> errorf( "Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    }
   }
 }
 
@@ -4640,7 +4634,7 @@ void death_knight_t::init_items()
   else if ( sigil == "sigil_of_virulence"                    ) sigils.virulence = 1;
   else
   {
-    log_t::output( sim, "simulationcraft: %s has unknown sigil %s", name(), sigil.c_str() );
+    sim -> errorf( "Player %s has unknown sigil %s", name(), sigil.c_str() );
   }
 }
 
@@ -4701,10 +4695,7 @@ double death_knight_t::composite_attribute_multiplier( int attr ) SC_CONST
     m *= 1.0 + buffs_rune_of_the_fallen_crusader -> value();
     if ( buffs_unbreakable_armor -> check() )
     {
-      if ( sim -> P333 )
-        m *= 1.10;
-      else
-        m *= 1.20;
+      m *= 1.20;
     }
   }
 
@@ -4716,6 +4707,18 @@ double death_knight_t::composite_spell_hit() SC_CONST
   double hit = player_t::composite_spell_hit();
   hit += 0.01 * talents.virulence;
   return hit;
+}
+
+double death_knight_t::composite_player_multiplier( int school ) SC_CONST
+{
+  double m = player_t::composite_player_multiplier( school );
+  // Factor flat multipliers here so they effect procs, grenades, etc.
+  m *= 1.0 + buffs_blood_presence -> value();
+  m *= 1.0 + buffs_bone_shield -> value();
+  m *= 1.0 + buffs_desolation -> value();
+  if ( school == SCHOOL_FROST || school == SCHOOL_SHADOW )
+    m *= 1.0 + talents.black_ice * 0.02;
+  return m;
 }
 
 void death_knight_t::regen( double periodicity )

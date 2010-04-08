@@ -83,11 +83,11 @@ struct patch_t
     *version  = ( int ) m % 100; m /= 100;
     *arch     = ( int ) m % 100;
   }
-  patch_t() { mask = encode( 3, 3, 2 ); }
+  patch_t() { mask = encode( 3, 3, 3 ); }
 };
 
-#define SC_MAJOR_VERSION "332"
-#define SC_MINOR_VERSION "4"
+#define SC_MAJOR_VERSION "333"
+#define SC_MINOR_VERSION "3"
 
 // Forward Declarations ======================================================
 
@@ -340,6 +340,8 @@ enum meta_gem_type
   META_SWIFT_STARFIRE,
   META_SWIFT_STARFLARE,
   META_TIRELESS_STARFLARE,
+  META_TRENCHANT_EARTHSIEGE,
+  META_TRENCHANT_EARTHSHATTER,
   META_GEM_MAX
 };
 
@@ -604,6 +606,7 @@ struct util_t
 
   static int string_split( std::vector<std::string>& results, const std::string& str, const char* delim, bool allow_quotes = false );
   static int string_split( const std::string& str, const char* delim, const char* format, ... );
+  static int string_strip_quotes( std::string& str );
 
   static std::string& to_string( int i );
   static std::string& to_string( double f, int precision );
@@ -885,7 +888,6 @@ struct sim_t
   char**      argv;
   sim_t*      parent;
   patch_t     patch;
-  int         P333;
   int         P400;
   event_t*    free_list;
   target_t*   target;
@@ -907,6 +909,7 @@ struct sim_t
   int         armor_update_interval, weapon_speed_scale_factors;
   int         optimal_raid, spell_crit_suppression, log, debug;
   int         save_profiles;
+  int         normalized_stat;
   std::string current_name, default_region_str, default_server_str;
 
   // Default stat enchants
@@ -961,6 +964,7 @@ struct sim_t
     int fortitude;
     int frost_fever;
     int heart_of_the_crusader;
+    int hellscreams_warsong;
     int heroic_presence;
     int horn_of_winter;
     int hunters_mark;
@@ -987,6 +991,7 @@ struct sim_t
     int savage_combat;
     int scorpid_sting;
     int strength_of_earth;
+    int strength_of_wrynn;
     int sunder_armor;
     int swift_retribution;
     int thunder_clap;
@@ -1058,6 +1063,7 @@ struct sim_t
   std::string output_file_str, log_file_str, html_file_str, wiki_file_str, xml_file_str;
   std::string path_str;
   std::deque<std::string> active_files;
+  std::vector<std::string> error_list;
   FILE* output_file;
   FILE* log_file;
   int armory_throttle;
@@ -1108,6 +1114,7 @@ struct sim_t
   void      aura_gain( const char* name, int aura_id=0 );
   void      aura_loss( const char* name, int aura_id=0 );
   action_expr_t* create_expression( action_t*, const std::string& name );
+  int       errorf( const char* format, ... );
 };
 
 // Scaling ===================================================================
@@ -1210,7 +1217,7 @@ struct item_t
   sim_t* sim;
   player_t* player;
   int slot;
-  bool unique, unique_enchant;
+  bool unique, unique_enchant, is_heroic;
 
   // Option Data
   std::string option_name_str;
@@ -1221,6 +1228,7 @@ struct item_t
   std::string option_equip_str;
   std::string option_use_str;
   std::string option_weapon_str;
+  std::string option_heroic_str;
   std::string options_str;
 
   // Armory Data
@@ -1230,6 +1238,7 @@ struct item_t
   std::string armory_gems_str;
   std::string armory_enchant_str;
   std::string armory_weapon_str;
+  std::string armory_heroic_str;
 
   // Encoded Data
   std::string id_str;
@@ -1240,6 +1249,7 @@ struct item_t
   std::string encoded_equip_str;
   std::string encoded_use_str;
   std::string encoded_weapon_str;
+  std::string encoded_heroic_str;
 
   // Extracted data
   gear_stats_t stats;
@@ -1257,9 +1267,10 @@ struct item_t
     bool active() { return stat || school; }
   } use, equip, enchant;
 
-  item_t() : sim( 0 ), player( 0 ), slot( SLOT_NONE ), unique( false ), unique_enchant( false ) {}
+  item_t() : sim( 0 ), player( 0 ), slot( SLOT_NONE ), unique( false ), unique_enchant( false ), is_heroic( false ) {}
   item_t( player_t*, const std::string& options_str );
   bool active() SC_CONST;
+  bool heroic() SC_CONST;
   const char* name() SC_CONST;
   const char* slot_name() SC_CONST;
   weapon_t* weapon() SC_CONST;
@@ -1271,6 +1282,7 @@ struct item_t
   bool decode_enchant();
   bool decode_special( special_effect_t&, const std::string& encoding );
   bool decode_weapon();
+  bool decode_heroic();
 
   static bool download_slot( item_t&, const std::string& item_id, const std::string& enchant_id, const std::string gem_ids[ 3 ] );
   static bool download_item( item_t&, const std::string& item_id );
@@ -1484,7 +1496,6 @@ struct player_t
   // Scale Factors
   gear_stats_t scaling;
   gear_stats_t normalized_scaling;
-  int          normalized_to;
   double       scaling_lag;
   int          scales_with[ STAT_MAX ];
   double       over_cap[ STAT_MAX ];
@@ -1504,6 +1515,7 @@ struct player_t
     buff_t* divine_spirit;
     buff_t* focus_magic;
     buff_t* fortitude;
+    buff_t* hellscreams_warsong;
     buff_t* heroic_presence;
     buff_t* indestructible_potion;
     buff_t* innervate;
@@ -1516,6 +1528,7 @@ struct player_t
     buff_t* replenishment;
     buff_t* speed_potion;
     buff_t* stoneform;
+    buff_t* strength_of_wrynn;
     buff_t* stunned;
     buff_t* tricks_of_the_trade;
     buff_t* wild_magic_potion_sp;
@@ -1660,6 +1673,7 @@ struct player_t
   virtual int    primary_resource() SC_CONST { return RESOURCE_NONE; }
   virtual int    primary_role() SC_CONST     { return ROLE_HYBRID; }
   virtual int    primary_tree() SC_CONST     { return TALENT_TREE_MAX; }
+  virtual int    normalize_by() SC_CONST;
 
   virtual void stat_gain( int stat, double amount );
   virtual void stat_loss( int stat, double amount );
@@ -1823,9 +1837,12 @@ struct pet_t : public player_t
 
   pet_t( sim_t* sim, player_t* owner, const std::string& name, bool guardian=false );
 
-  virtual double composite_attack_expertise() SC_CONST { return owner -> composite_attack_hit() * 26.0 / 8.0; }
-  virtual double composite_attack_hit()       SC_CONST { return owner -> composite_attack_hit(); }
-  virtual double composite_spell_hit()        SC_CONST { return owner -> composite_spell_hit();  }
+  // Pets gain their owners' hit rating, but it rounds down to a
+  // percentage.  Also, heroic presence does not contribute to pet
+  // expertise, so we use raw attack_hit.
+  virtual double composite_attack_expertise() SC_CONST { return floor(floor(100.0 * owner -> attack_hit) * 26.0 / 8.0) / 100.0; }
+  virtual double composite_attack_hit()       SC_CONST { return floor(100.0 * owner -> composite_attack_hit()) / 100.0; }
+  virtual double composite_spell_hit()        SC_CONST { return floor(100.0 * owner -> composite_spell_hit()) / 100.0;  }
 
   virtual double stamina() SC_CONST;
   virtual double intellect() SC_CONST;
@@ -2037,7 +2054,7 @@ struct action_t
   double min_current_time, max_current_time;
   double min_time_to_die, max_time_to_die;
   double min_health_percentage, max_health_percentage;
-  int P333, P400, moving, vulnerable, invulnerable, wait_on_ready;
+  int P400, moving, vulnerable, invulnerable, wait_on_ready;
   double snapshot_haste;
   bool recast;
   std::string if_expr_str;
@@ -2339,14 +2356,17 @@ struct unique_gear_t
 
   static bool get_equip_encoding( std::string& encoding,
                                   const std::string& item_name,
+                                  const bool         item_heroic,
                                   const std::string& item_id=std::string() );
 
   static bool get_hidden_encoding( std::string&       encoding,
                                    const std::string& item_name,
+                                   const bool         item_heroic,
                                    const std::string& item_id=std::string() );
 
   static bool get_use_encoding  ( std::string& encoding,
                                   const std::string& item_name,
+                                  const bool         item_heroic,
                                   const std::string& item_id=std::string() );
 };
 
@@ -2641,10 +2661,10 @@ struct xml_t
   static bool get_value( std::string& value, xml_node_t* root, const std::string& path = std::string() );
   static bool get_value( int&         value, xml_node_t* root, const std::string& path = std::string() );
   static bool get_value( double&      value, xml_node_t* root, const std::string& path = std::string() );
-  static xml_node_t* download( const std::string& url, const std::string& confirmation=std::string(), int64_t timestamp=0, int throttle_seconds=0 );
-  static xml_node_t* download_cache( const std::string& url, int64_t timestamp=0 );
-  static xml_node_t* create( const std::string& input );
-  static xml_node_t* create( FILE* input );
+  static xml_node_t* download( sim_t* sim, const std::string& url, const std::string& confirmation=std::string(), int64_t timestamp=0, int throttle_seconds=0 );
+  static xml_node_t* download_cache( sim_t* sim, const std::string& url, int64_t timestamp=0 );
+  static xml_node_t* create( sim_t* sim, const std::string& input );
+  static xml_node_t* create( sim_t* sim, FILE* input );
   static void print( xml_node_t* root, FILE* f=0, int spacing=0 );
 };
 
@@ -2661,8 +2681,8 @@ struct js_t
   static bool get_value( std::string& value, js_node_t* root, const std::string& path = std::string() );
   static bool get_value( int&         value, js_node_t* root, const std::string& path = std::string() );
   static bool get_value( double&      value, js_node_t* root, const std::string& path = std::string() );
-  static js_node_t* create( const std::string& input );
-  static js_node_t* create( FILE* input );
+  static js_node_t* create( sim_t* sim, const std::string& input );
+  static js_node_t* create( sim_t* sim, FILE* input );
   static void print( js_node_t* root, FILE* f=0, int spacing=0 );
 };
 

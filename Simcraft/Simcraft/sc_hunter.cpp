@@ -374,8 +374,8 @@ struct hunter_pet_t : public pet_t
   {
     if ( ! supported( pet_type ) )
     {
-      util_t::fprintf( stdout, "simulationcraft: Pet %s is not yet supported.\n", pet_name.c_str() );
-      exit( 0 );
+      sim -> errorf( "Pet %s is not yet supported.\n", pet_name.c_str() );
+      sim -> cancel();
     }
 
     hunter_t* o = owner -> cast_hunter();
@@ -969,9 +969,8 @@ static void check_pet_type( action_t* a, int pet_type )
 
   if ( p -> pet_type != pet_type )
   {
-    util_t::fprintf( a -> sim -> output_file,
-		     "\nsimulationcraft: Player %s has pet %s attempting to use action %s that is not available to that class of pets.\n",
-		     o -> name(), p -> name(), a -> name() );
+    a -> sim -> errorf( "Player %s has pet %s attempting to use action %s that is not available to that class of pets.\n",
+			o -> name(), p -> name(), a -> name() );
     a -> background = true;
   }
 }
@@ -1054,12 +1053,8 @@ struct hunter_pet_attack_t : public attack_t
 
       if ( result == RESULT_CRIT )
       {
-        hunter_t* o = p -> owner -> cast_hunter();
-        if ( ! sim -> P333 )
-          p -> sim -> auras.ferocious_inspiration -> trigger( 1, o -> talents.ferocious_inspiration, o -> talents.ferocious_inspiration > 0 );
         p -> buffs_frenzy -> trigger();
         if ( special ) trigger_invigoration( this );
-
         p -> buffs_wolverine_bite -> trigger();
       }
     }
@@ -2599,6 +2594,7 @@ struct serpent_sting_t : public hunter_attack_t
                                p -> set_bonus.tier8_2pc_melee() * 0.1 );
 
     tick_may_crit = ( p -> set_bonus.tier9_2pc_melee() != 0 );
+    base_crit_bonus_multiplier *= 1.0 + ( p -> talents.mortal_shots * 0.06 );
 
     observer = &( p -> active_serpent_sting );
   }
@@ -2711,8 +2707,8 @@ struct steady_shot_t : public hunter_attack_t
 
     base_cost *= 1.0 - p -> talents.master_marksman * 0.05;
 
-    base_multiplier *= 1.0 + p -> talents.sniper_training              * 0.02
-                       + p -> talents.ferocious_inspiration * ( p -> sim -> P333 ? 0.03 : 0 );
+    base_multiplier *= 1.0 + ( p -> talents.sniper_training       * 0.02 +
+			       p -> talents.ferocious_inspiration * 0.03 );
 
     base_multiplier *= p -> ranged_weapon_specialization_multiplier();
 
@@ -3397,7 +3393,10 @@ void hunter_t::init_glyphs()
     else if ( n == "the_pack"           ) ;
     else if ( n == "volley"             ) ;
     else if ( n == "wyvern_sting"       ) ;
-    else if ( ! sim -> parent ) util_t::fprintf( sim -> output_file, "simulationcraft: Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    else if ( ! sim -> parent ) 
+    {
+      sim -> errorf( "Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    }
   }
 }
 
@@ -3610,7 +3609,7 @@ void hunter_t::init_actions()
 {
   if ( ranged_weapon.group() != WEAPON_RANGED )
   {
-    log_t::output( sim, "Player %s does not have a ranged weapon at the Ranged slot.", name() );
+    sim -> errorf( "Player %s does not have a ranged weapon at the Ranged slot.", name() );
     quiet = true;
     return;
   }
@@ -3618,9 +3617,10 @@ void hunter_t::init_actions()
   if ( action_list_str.empty() )
   {
     action_list_str = "flask,type=endless_rage";
-    action_list_str += ( primary_tree() != TREE_MARKSMANSHIP ) ? "/food,type=blackened_dragonfin" : "/food,type=hearty_rhino";
+    action_list_str += ( primary_tree() != TREE_SURVIVAL ) ? "/food,type=hearty_rhino" : "/food,type=blackened_dragonfin";
     action_list_str += "/hunters_mark/summon_pet";
     if ( talents.trueshot_aura ) action_list_str += "/trueshot_aura";
+    action_list_str += "/speed_potion,if=!in_combat|buff.bloodlust.react";
     action_list_str += "/auto_shot";
     action_list_str += "/snapshot_stats";
     int num_items = ( int ) items.size();
@@ -3632,52 +3632,135 @@ void hunter_t::init_actions()
         action_list_str += items[ i ].name();
       }
     }
-    if ( race == RACE_ORC )
+    switch ( race )
     {
-      action_list_str += "/blood_fury";
+    case RACE_ORC:       action_list_str += "/blood_fury,time>=10";     break;
+    case RACE_TROLL:     action_list_str += "/berserking,time>=10";     break;
+    case RACE_BLOOD_ELF: action_list_str += "/arcane_torrent,time>=10"; break;
     }
-    else if ( race == RACE_TROLL )
+    switch ( primary_tree() )
     {
-      action_list_str += "/berserking";
-    }
-    else if ( race == RACE_BLOOD_ELF )
-    {
-      action_list_str += "/arcane_torrent";
-    }
-    if ( talents.bestial_wrath ) action_list_str += "/kill_command,sync=bestial_wrath/bestial_wrath";
-    action_list_str += "/aspect";
-    if ( talents.chimera_shot ) action_list_str += "/serpent_sting";
-    action_list_str += "/rapid_fire";
-    if ( primary_tree() != TREE_MARKSMANSHIP ) action_list_str += "/kill_shot";
-    if ( ! talents.bestial_wrath  ) action_list_str += "/kill_command";
-    if (   talents.silencing_shot ) action_list_str += "/silencing_shot";
-    if ( primary_tree() == TREE_MARKSMANSHIP )
-    {
-      if( talents.aimed_shot ) action_list_str += "/aimed_shot";
-    }
-    if ( talents.chimera_shot )
-    {
-      action_list_str += "/wait,sec=0.1,if=cooldown.chimera_shot.remains>0&cooldown.chimera_shot.remains<0.25";
-      action_list_str += "/chimera_shot";
-    }
-    if ( primary_tree() == TREE_MARKSMANSHIP ) action_list_str += "/kill_shot";
-    if (   talents.explosive_shot ) action_list_str += "/explosive_shot";
-    if (   talents.black_arrow    ) action_list_str += "/black_arrow";
-    if ( ! talents.chimera_shot   ) action_list_str += "/serpent_sting";
-    if ( primary_tree() == TREE_MARKSMANSHIP )
-    {
-      if( talents.improved_arcane_shot ) action_list_str += "/arcane_shot";
-      if( talents.readiness            ) action_list_str += "/readiness,wait_for_rapid_fire=1";
-    }
-    else
-    {
-      if ( ! talents.aimed_shot     ) action_list_str += "/multi_shot";
+    case TREE_BEAST_MASTERY:
+      if ( talents.bestial_wrath )
+      {
+        action_list_str += "/kill_command,sync=bestial_wrath";
+        if ( talents.catlike_reflexes == 0 )
+        {
+          action_list_str += "/kill_command,if=cooldown.bestial_wrath.remains>=60";
+        }
+        else if ( talents.catlike_reflexes == 1 )
+        {
+          action_list_str += "/kill_command,if=cooldown.bestial_wrath.remains>=50";
+        }
+        else if ( talents.catlike_reflexes == 2 )
+        {
+          action_list_str += "/kill_command,if=cooldown.bestial_wrath.remains>=40";
+        }
+        else
+        {
+          action_list_str += "/kill_command,if=cooldown.bestial_wrath.remains>=30";
+        }
+        action_list_str += "/bestial_wrath";
+      }
+      else
+      {
+        action_list_str += "/kill_command";
+      }
+      action_list_str += "/aspect";
+      if ( talents.rapid_killing == 0 )
+      {
+        action_list_str += "/rapid_fire,if=buff.bloodlust.react";
+      }
+      else if ( talents.rapid_killing == 1 )
+      {
+        action_list_str += "/rapid_fire";
+      }
+      else
+      {
+        action_list_str += "/rapid_fire,time<=60";
+        action_list_str += "/rapid_fire,if=buff.bloodlust.react";
+      }
+      action_list_str += "/kill_shot";
+      action_list_str += "/serpent_sting";
+      if ( talents.aimed_shot )
+      {
+        action_list_str += "/aimed_shot";
+      }
+      else
+      {
+        action_list_str += "/multi_shot";
+      }
+      if ( ( talents.improved_arcane_shot > 0 ) || ! glyphs.steady_shot || ( initial_stats.armor_penetration_rating < 800 ) ) action_list_str += "/arcane_shot";
+      action_list_str += "/steady_shot";
+      break;
+    case TREE_MARKSMANSHIP:
+      action_list_str += "/aspect";
+      action_list_str += "/serpent_sting";
+      if ( talents.rapid_killing == 0 ) 
+      {
+        action_list_str += "/rapid_fire,if=buff.bloodlust.react";
+      }
+      else if ( talents.rapid_killing == 1 )
+      {
+        action_list_str += "/rapid_fire";
+      }
+      else
+      {
+        action_list_str += "/rapid_fire,time<=60";
+        action_list_str += "/rapid_fire,if=buff.bloodlust.react";
+      }
+      action_list_str += "/kill_command";
+      if ( talents.silencing_shot ) action_list_str += "/silencing_shot";
+      if ( talents.aimed_shot ) 
+      {
+        action_list_str += "/aimed_shot";
+      }
+      else
+      {
+        action_list_str += "/multi_shot";
+      }
+      if ( talents.chimera_shot )
+      {
+        action_list_str += "/wait,sec=0.1,if=cooldown.chimera_shot.remains>0&cooldown.chimera_shot.remains<0.25";
+        action_list_str += "/chimera_shot";
+      }
+      action_list_str += "/kill_shot";
+      if ( ( talents.improved_arcane_shot > 0 ) || ! glyphs.steady_shot || ( initial_stats.armor_penetration_rating < 600 ) ) action_list_str += "/arcane_shot";
+      if ( talents.rapid_killing == 0 ) action_list_str += "/readiness,time<=60";
+      action_list_str += "/readiness,wait_for_rapid_fire=1";
+      action_list_str += "/steady_shot";
+      break;
+    case TREE_SURVIVAL:
+      action_list_str += "/aspect";
+      if ( talents.rapid_killing == 0 )
+      {
+        action_list_str += "/rapid_fire,if=buff.bloodlust.react";
+      }
+      else if ( talents.rapid_killing == 1 )
+      {
+        action_list_str += "/rapid_fire";
+      }
+      else
+      {
+        action_list_str += "/rapid_fire,time<=60";
+        action_list_str += "/rapid_fire,if=buff.bloodlust.react";
+      }
+      action_list_str += "/kill_command";
+      if ( talents.explosive_shot ) action_list_str += "/explosive_shot";
+      if ( talents.black_arrow ) action_list_str += "/black_arrow";
+      action_list_str += "/serpent_sting";
+      if ( talents.aimed_shot )
+      {
+        action_list_str += "/aimed_shot";
+      }
+      else
+      {
+        action_list_str += "/multi_shot";
+      }
       if ( ! talents.explosive_shot ) action_list_str += "/arcane_shot";
-      if (   talents.readiness      ) action_list_str += "/readiness,wait_for_rapid_fire=1";
-      if (   talents.aimed_shot     ) action_list_str += "/aimed_shot";
+      action_list_str += "/steady_shot";
+      break;
     }
-
-    action_list_str += "/steady_shot";
 
     action_list_default = 1;
   }
@@ -3702,8 +3785,7 @@ void hunter_t::combat_begin()
 {
   player_t::combat_begin();
 
-  if ( sim -> P333 )
-    sim -> auras.ferocious_inspiration -> trigger( 1, talents.ferocious_inspiration, talents.ferocious_inspiration > 0 );
+  sim -> auras.ferocious_inspiration -> trigger( 1, talents.ferocious_inspiration, talents.ferocious_inspiration > 0 );
 }
 
 // hunter_t::reset ===========================================================
@@ -4013,10 +4095,7 @@ player_t* player_t::create_hunter( sim_t* sim, const std::string& name, int race
 void player_t::hunter_init( sim_t* sim )
 {
   sim -> auras.trueshot              = new aura_t( sim, "trueshot" );
-  if ( sim -> P333 )
-    sim -> auras.ferocious_inspiration = new aura_t( sim, "ferocious_inspiration" );
-  else
-    sim -> auras.ferocious_inspiration = new aura_t( sim, "ferocious_inspiration", 1, 10.0 );
+  sim -> auras.ferocious_inspiration = new aura_t( sim, "ferocious_inspiration" );
 
   target_t* t = sim -> target;
   t -> debuffs.hunters_mark  = new debuff_t( sim, "hunters_mark",  1, 300.0 );

@@ -156,9 +156,9 @@ static void register_black_bruise( item_t* item )
 
   item -> unique = true;
 
-  bool heroic = ( item -> encoded_stats_str.find( "69sta" ) != std::string::npos );  // FIXME!! Yuck!
+  bool heroic = item -> heroic();
 
-  buff_t* buff = new buff_t( p, "black_bruise", 1, 10, 0.0, 0.0275 ); // FIXME!! Cooldown?
+  buff_t* buff = new buff_t( p, "black_bruise", 1, 10, 0.0, 0.03 ); // FIXME!! Cooldown?
 
   struct black_bruise_spell_t : public spell_t
   {
@@ -175,6 +175,7 @@ static void register_black_bruise( item_t* item )
       reset();
     }
     virtual void player_buff() { }
+    virtual double total_dd_multiplier() SC_CONST { return base_dd_multiplier; }
   };
 
   struct black_bruise_trigger_t : public action_callback_t
@@ -186,6 +187,8 @@ static void register_black_bruise( item_t* item )
       // FIXME! Can specials trigger the proc?
       // FIXME! Apparently both hands proc the buff even though only equipped in main hand
       if ( ! a -> weapon ) return;
+      if ( a -> proc ) return;
+
       buff -> trigger();
     }
   };
@@ -199,19 +202,19 @@ static void register_black_bruise( item_t* item )
     {
       // FIXME! Can specials trigger the damage?
       // FIXME! What about melee attacks that do no weapon damage?
-      // FIXME! Is the 10% after normal damage reduction?
-      // FIXME! Does the 10% benefit from debuffs?
       if ( ! a -> weapon ) return;
+      if ( a -> proc ) return;
+
       if ( buff -> up() )
       {
-        spell -> base_dd_adder = a -> direct_dmg;
+        spell -> base_dd_adder = a -> direct_dmg - 1;
         spell -> execute();
       }
     }
   };
 
   p -> register_attack_result_callback( RESULT_HIT_MASK, new black_bruise_trigger_t( p, buff ) );
-  p -> register_direct_damage_callback( (1 << SCHOOL_PHYSICAL), new black_bruise_damage_t( p, buff, new black_bruise_spell_t( p, heroic ) ) );
+  p -> register_direct_damage_callback( -1, new black_bruise_damage_t( p, buff, new black_bruise_spell_t( p, heroic ) ) );
 }
 
 // register_darkmoon_card_greatness =========================================
@@ -250,7 +253,7 @@ static void register_deaths_choice( item_t* item )
 
   item -> unique = true;
 
-  double value = ( item -> encoded_stats_str == "288ap" ) ? 510.0 : 450.0;
+  double value = ( item -> heroic() ) ? 510.0 : 450.0;
 
   int stat = ( p -> attribute[ ATTR_STRENGTH ] > p -> attribute[ ATTR_AGILITY ] ) ? STAT_STRENGTH : STAT_AGILITY;
 
@@ -323,9 +326,7 @@ static void register_deathbringers_will( item_t* item )
     }
   };
 
-  bool heroic = ( item -> encoded_stats_str != "155arpen" );  // FIXME!! Yuck!
-
-  p -> register_attack_result_callback( RESULT_HIT_MASK, new deathbringers_will_callback_t( p, heroic ) );
+  p -> register_attack_result_callback( RESULT_HIT_MASK, new deathbringers_will_callback_t( p, item -> heroic() ) );
 }
 
 // register_empowered_deathbringer ==========================================
@@ -380,6 +381,58 @@ static void register_empowered_deathbringer( item_t* item )
   p -> register_attack_result_callback( RESULT_HIT_MASK, new deathbringer_callback_t( p, new deathbringer_spell_t( p ) ) );
 }
 
+// register_raging_deathbringer ==========================================
+
+static void register_raging_deathbringer( item_t* item )
+{
+  player_t* p = item -> player;
+
+  item -> unique = true;
+
+  struct deathbringer_spell_t : public spell_t
+  {
+    deathbringer_spell_t( player_t* p ) :
+        spell_t( "raging_deathbringer", p, RESOURCE_NONE, SCHOOL_SHADOW )
+    {
+      trigger_gcd = 0;
+      background  = true;
+      may_miss = false;
+      may_crit = true;
+      base_dd_min = 1458;
+      base_dd_max = 1874;
+      base_spell_power_multiplier = 0;
+      reset();
+    }
+    virtual void player_buff()
+    {
+      spell_t::player_buff();
+      player_crit = player -> composite_attack_crit(); // FIXME! Works like a spell in most ways accept source of crit.
+    }
+  };
+
+  struct deathbringer_callback_t : public action_callback_t
+  {
+    spell_t* spell;
+    rng_t* rng;
+
+    deathbringer_callback_t( player_t* p, spell_t* s ) :
+        action_callback_t( p -> sim, p ), spell( s )
+    {
+      rng  = p -> get_rng ( "raging_deathbringer", RNG_DEFAULT );
+    }
+
+    virtual void trigger( action_t* a )
+    {
+      if ( rng -> roll( 0.08 ) ) // FIXME!! Using 8% of -hits-
+      {
+        spell -> execute();
+      }
+    }
+  };
+
+  p -> register_attack_result_callback( RESULT_HIT_MASK, new deathbringer_callback_t( p, new deathbringer_spell_t( p ) ) );
+}
+
 // register_nibelung ========================================================
 
 static void register_nibelung( item_t* item )
@@ -390,15 +443,17 @@ static void register_nibelung( item_t* item )
 
   struct nibelung_spell_t : public spell_t
   {
-    nibelung_spell_t( player_t* p ) :
-        spell_t( "valkyr_smite", p, RESOURCE_NONE, SCHOOL_HOLY )
+    bool heroic;
+
+    nibelung_spell_t( player_t* p, bool h ) :
+        spell_t( "valkyr_smite", p, RESOURCE_NONE, SCHOOL_HOLY ), heroic( h )
     {
       trigger_gcd = 0;
       background  = true;
       may_miss = false;
       may_crit = true;
-      base_dd_min = 1591;
-      base_dd_max = 1785;
+      base_dd_min = heroic ? 1803 : 1591;
+      base_dd_max = heroic ? 2022 : 1785;
       base_crit = 0.05;
       reset();
     }
@@ -455,7 +510,7 @@ static void register_nibelung( item_t* item )
     }
   };
 
-  p -> register_spell_direct_result_callback( RESULT_HIT_MASK, new nibelung_callback_t( p, new nibelung_spell_t( p ) ) );
+  p -> register_spell_direct_result_callback( RESULT_HIT_MASK, new nibelung_callback_t( p, new nibelung_spell_t( p, item -> heroic() ) ) );
 }
 
 // register_shadowmourne ====================================================
@@ -468,8 +523,8 @@ static void register_shadowmourne( item_t* item )
 
   // http://ptr.wowhead.com/?spell=71903
   // FIX ME! Duration? Colldown? Chance?
-  buff_t* buff_stacks = new stat_buff_t( p, "shadowmourne_stacks", STAT_STRENGTH,  30, 10, 60.0, 0.20 );
-  buff_t* buff_final  = new stat_buff_t( p, "shadowmourne_final",  STAT_STRENGTH, 270, 10, 10.0, 1 );
+  buff_t* buff_stacks = new stat_buff_t( p, "shadowmourne_stacks", STAT_STRENGTH,  30, 10, 60.0,  0.0, 1 );
+  buff_t* buff_final  = new stat_buff_t( p, "shadowmourne_final",  STAT_STRENGTH, 270, 10, 10.0, 10.0, 1 );
 
   struct shadowmourne_spell_t : public spell_t
   {
@@ -501,7 +556,10 @@ static void register_shadowmourne( item_t* item )
       // FIXME! Can specials trigger the proc?
       if ( ! a -> weapon ) return;
       if ( a -> weapon -> slot != slot ) return;
-      buff_stacks -> trigger();
+      // http://elitistjerks.com/f15/t89289-shadowmourne/p6/#post1592143
+      // Full Stack => Final buff + 10s cd on stack gain
+      // Basically means no now stacks if the final buff is up
+      if ( ! buff_final -> check() ) buff_stacks -> trigger();
       if ( buff_stacks -> stack() == buff_stacks -> max_stack )
       {
         buff_stacks -> expire();
@@ -522,7 +580,9 @@ static void register_tiny_abom( item_t* item )
 
   item -> unique = true;
 
-  buff_t* buff = new buff_t( p, "mote_of_anger", 8, 0, 0, 0.5 );
+  bool heroic = item -> heroic();
+
+  buff_t* buff = new buff_t( p, "mote_of_anger", 8 - heroic, 0, 0, 0.5 );
 
   struct tiny_abom_trigger_t : public action_callback_t
   {
@@ -530,6 +590,9 @@ static void register_tiny_abom( item_t* item )
     std::string proc_name;
     stats_t *old_stats;
     attack_t *first_stack_attack;
+    int result;
+    double resource_consumed, direct_dmg, resisted_dmg, blocked_dmg;
+    double time_to_execute;
 
     tiny_abom_trigger_t( player_t* p, buff_t* b ) : action_callback_t( p -> sim, p ), buff( b ), proc_name( "manifest_anger" ),
         old_stats( p -> get_stats( "manifest_anger" ) ), first_stack_attack( NULL )
@@ -542,14 +605,18 @@ static void register_tiny_abom( item_t* item )
     }
     virtual void trigger( action_t* a )
     {
+      if ( ! a -> weapon ) return;
       if ( a -> proc ) return;
+      // We cannot proc a mote from manifest_anger attack
+      if ( a -> name_str == "manifest_anger" ) return;
+
       // If this is the first stack, save the weapon which made the
       // attack for use as the proc later.  If this was a proc from a
       // spell, just use the main hand weapon.
       if ( buff -> trigger() && buff -> stack() == 1 )
       {
         assert( first_stack_attack == NULL );
-        if ( a -> weapon && a -> weapon -> slot == SLOT_OFF_HAND )
+        if ( a -> weapon -> slot == SLOT_OFF_HAND )
         {
           first_stack_attack = a -> player -> off_hand_attack;
         }
@@ -564,26 +631,50 @@ static void register_tiny_abom( item_t* item )
         assert( attack != NULL );
         first_stack_attack = NULL;
         buff -> expire();
+
         // This is pretty much a hack to repeat a melee attack under a
         // different name with slightly different parameters.
+        // 
+        // Additionally, we need to restore the result of the 
+        // attack that caused manifest_anger. Otherwise direct damage
+        // callbacks that are triggered after manifest_anger has executed,
+        // will use the results of the manifest_anger attack.
+
         std::swap( proc_name, attack -> name_str );
         std::swap( old_stats, attack -> stats );
+        result            = attack -> result;
+        resource_consumed = attack -> resource_consumed;
+        direct_dmg        = attack -> direct_dmg;
+        resisted_dmg      = attack -> resisted_dmg;
+        blocked_dmg       = attack -> blocked_dmg;
+	time_to_execute   = attack -> time_to_execute;
+
+	attack -> time_to_execute = 0;
+        attack -> base_hit += ( attack -> player -> dual_wield() ) ? 0.19 : 0;
+        attack -> repeating = false;
         attack -> may_glance = false;
         attack -> special = true;
-        attack -> proc = true;
         attack -> base_multiplier *= 0.5;
         attack -> execute();
         attack -> base_multiplier /= 0.5;
         attack -> may_glance = true;
         attack -> special = false;
-        attack -> proc = false;
+        attack -> repeating = true;
+        attack -> base_hit -= ( attack -> player -> dual_wield() ) ? 0.19 : 0;
+
         std::swap( proc_name, attack -> name_str );
         std::swap( old_stats, attack -> stats );
+        attack -> result            = result;
+        attack -> resource_consumed = resource_consumed;
+        attack -> direct_dmg        = direct_dmg;
+        attack -> resisted_dmg      = resisted_dmg;
+        attack -> blocked_dmg       = blocked_dmg;
+	attack -> time_to_execute   = time_to_execute;
       }
     }
   };
 
-  p -> register_direct_damage_callback( (1 << SCHOOL_PHYSICAL), new tiny_abom_trigger_t( p, buff ) );
+  p -> register_direct_damage_callback( -1, new tiny_abom_trigger_t( p, buff ) );
 }
 
 // ==========================================================================
@@ -615,6 +706,7 @@ void unique_gear_t::init( player_t* p )
     if ( ! strcmp( item.name(), "deaths_choice"             ) ) register_deaths_choice          ( &item );
     if ( ! strcmp( item.name(), "deaths_verdict"            ) ) register_deaths_choice          ( &item );
     if ( ! strcmp( item.name(), "empowered_deathbringer"    ) ) register_empowered_deathbringer ( &item );
+    if ( ! strcmp( item.name(), "raging_deathbringer"       ) ) register_raging_deathbringer    ( &item );
     if ( ! strcmp( item.name(), "nibelung"                  ) ) register_nibelung               ( &item );
     if ( ! strcmp( item.name(), "shadowmourne"              ) ) register_shadowmourne           ( &item );
     if ( ! strcmp( item.name(), "tiny_abomination_in_a_jar" ) ) register_tiny_abom              ( &item );
@@ -776,6 +868,7 @@ action_callback_t* unique_gear_t::register_discharge_proc( item_t& i,
 
 bool unique_gear_t::get_equip_encoding( std::string&       encoding,
                                         const std::string& name,
+                                        const bool         heroic, 
                                         const std::string& id )
 {
   std::string e;
@@ -786,6 +879,8 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
   else if ( name == "ashen_band_of_unmatched_destruction" ) e = "OnSpellCastHit_285SP_10%_10Dur_60Cd";
   else if ( name == "ashen_band_of_endless_vengeance"     ) e = "OnAttackHit_480AP_1PPM_10Dur_60Cd";
   else if ( name == "ashen_band_of_unmatched_vengeance"   ) e = "OnAttackHit_480AP_1PPM_10Dur_60Cd";
+  else if ( name == "ashen_band_of_endless_might"         ) e = "OnAttackHit_480AP_1PPM_10Dur_60Cd";
+  else if ( name == "ashen_band_of_unmatched_might"       ) e = "OnAttackHit_480AP_1PPM_10Dur_60Cd";
   else if ( name == "banner_of_victory"                   ) e = "OnAttackHit_1008AP_20%_10Dur_50Cd";
   else if ( name == "black_magic"                         ) e = "OnSpellDirectHit_250Haste_35%_10Dur_35Cd";
   else if ( name == "blood_of_the_old_god"                ) e = "OnAttackCrit_1284AP_10%_10Dur_50Cd";
@@ -809,7 +904,7 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
   else if ( name == "mirror_of_truth"                     ) e = "OnAttackCrit_1000AP_10%_10Dur_50Cd";
   else if ( name == "mithril_pocketwatch"                 ) e = "OnSpellCast_590SP_10%_10Dur_45Cd";
   else if ( name == "mjolnir_runestone"                   ) e = "OnAttackHit_665ArPen_15%_10Dur_45Cd";
-  else if ( name == "muradins_spyglass"                   ) e = ( id == "50340" ? "OnSpellDamage_18SP_10Stack_10Dur" : "OnSpellDamage_20SP_10Stack_10Dur" );
+  else if ( name == "muradins_spyglass"                   ) e = ( heroic ? "OnSpellDamage_20SP_10Stack_10Dur" : "OnSpellDamage_18SP_10Stack_10Dur" );
   else if ( name == "needleencrusted_scorpion"            ) e = "OnAttackCrit_678ArPen_10%_10Dur_50Cd";
   else if ( name == "pandoras_plea"                       ) e = "OnSpellCast_751SP_10%_10Dur_45Cd";
   else if ( name == "purified_lunar_dust"                 ) e = "OnSpellCast_304MP5_10%_15Dur_45Cd";
@@ -821,23 +916,25 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
   else if ( name == "wrath_of_cenarius"                   ) e = "OnSpellCastHit_132SP_5%_10Dur";
 
   // Some Normal/Heroic items have same name
-  else if ( name == "phylactery_of_the_nameless_lich"     ) e = ( id == "50360" ? "OnSpellTickDamage_918SP_30%_20Dur_90Cd" : "OnSpellTickDamage_1032SP_30%_20Dur_90Cd" );
-  else if ( name == "whispering_fanged_skull"             ) e = ( id == "50342" ? "OnAttackHit_1110AP_35%_15Dur_45Cd"      : "OnAttackHit_1250AP_35%_15Dur_45Cd"       );
+  else if ( name == "phylactery_of_the_nameless_lich"     ) e = ( heroic ? "OnSpellTickDamage_1206SP_30%_20Dur_100Cd" : "OnSpellTickDamage_1073SP_30%_20Dur_100Cd" );
+  else if ( name == "whispering_fanged_skull"             ) e = ( heroic ? "OnAttackHit_1250AP_35%_15Dur_45Cd" : "OnAttackHit_1110AP_35%_15Dur_45Cd" );
 
   // Stat Procs with Tick Increases
-  else if ( name == "dislodged_foreign_object"            ) e = ( id == "50353" ? "OnSpellCast_105SP_10Stack_10%_20Dur_45Cd_2Tick" : "OnSpellCast_121SP_10Stack_10%_20Dur_45Cd_2Tick" );
-
+  else if ( name == "dislodged_foreign_object"            ) e = ( heroic ? "OnSpellCast_121SP_10Stack_10%_20Dur_45Cd_2Tick" : "OnSpellCast_105SP_10Stack_10%_20Dur_45Cd_2Tick" );
+  
   // Discharge Procs
   else if ( name == "bandits_insignia"                    ) e = "OnAttackHit_1880Arcane_15%_45Cd";
   else if ( name == "extract_of_necromantic_power"        ) e = "OnSpellTickDamage_1050Shadow_10%_15Cd";
   else if ( name == "lightning_capacitor"                 ) e = "OnSpellDirectCrit_750Nature_3Stack_2.5Cd";
   else if ( name == "timbals_crystal"                     ) e = "OnSpellTickDamage_380Shadow_10%_15Cd";
   else if ( name == "thunder_capacitor"                   ) e = "OnSpellDirectCrit_1276Nature_4Stack_2.5Cd";
-  else if ( name == "bryntroll_the_bone_arbiter"          ) e = "OnAttackHit_2200Drain_11%";
+  else if ( name == "bryntroll_the_bone_arbiter"          ) e = ( heroic ? "OnAttackHit_2538Drain_11%" : "OnAttackHit_2250Drain_11%" );
 
   // Some Normal/Heroic items have same name
-  else if ( name == "reign_of_the_unliving"               ) e = ( id == "47182" ? "OnSpellDirectCrit_1882Fire_3Stack_2.0Cd" : "OnSpellDirectCrit_2117Fire_3Stack_2.0Cd" );
-  else if ( name == "reign_of_the_dead"                   ) e = ( id == "47316" ? "OnSpellDirectCrit_1882Fire_3Stack_2.0Cd" : "OnSpellDirectCrit_2117Fire_3Stack_2.0Cd" );
+  else if ( name == "reign_of_the_unliving"               ) e = ( heroic ? "OnSpellDirectCrit_2117Fire_3Stack_2.0Cd" : "OnSpellDirectCrit_1882Fire_3Stack_2.0Cd" );
+  else if ( name == "reign_of_the_dead"                   ) e = ( heroic ? "OnSpellDirectCrit_2117Fire_3Stack_2.0Cd" : "OnSpellDirectCrit_1882Fire_3Stack_2.0Cd" );
+  else if ( name == "solace_of_the_defeated"              ) e = ( heroic ? "OnSpellCast_18MP5_8Stack_10Dur" : "OnSpellCast_16MP5_8Stack_10Dur" );
+  else if ( name == "solace_of_the_fallen"                ) e = ( heroic ? "OnSpellCast_18MP5_8Stack_10Dur" : "OnSpellCast_16MP5_8Stack_10Dur" );
 
   // Enchants
   else if ( name == "lightweave"                          ) e = "OnSpellCast_295SP_35%_15Dur_60Cd";  // temporary for backwards compatibility
@@ -863,6 +960,7 @@ bool unique_gear_t::get_equip_encoding( std::string&       encoding,
 
 bool unique_gear_t::get_hidden_encoding( std::string&       encoding,
     const std::string& name,
+    const bool         heroic,
     const std::string& id )
 {
   std::string e;
@@ -884,6 +982,7 @@ bool unique_gear_t::get_hidden_encoding( std::string&       encoding,
 
 bool unique_gear_t::get_use_encoding( std::string&       encoding,
                                       const std::string& name,
+                                      const bool         heroic,
                                       const std::string& id )
 {
   std::string e;
@@ -906,10 +1005,10 @@ bool unique_gear_t::get_use_encoding( std::string&       encoding,
   else if ( name == "wrathstone"                  ) e = "856AP_20Dur_120Cd";
 
   // Hybrid
-  else if ( name == "fetish_of_volatile_power"   ) e = ( id == "47879" ? "OnSpellCast_57Haste_8Stack_20Dur_120Cd" : "OnSpellCast_64Haste_8Stack_20Dur_120Cd" );
-  else if ( name == "talisman_of_volatile_power" ) e = ( id == "47726" ? "OnSpellCast_57Haste_8Stack_20Dur_120Cd" : "OnSpellCast_64Haste_8Stack_20Dur_120Cd" );
-  else if ( name == "vengeance_of_the_forsaken"  ) e = ( id == "47881" ? "OnAttackHit_215AP_5Stack_20Dur_120Cd"  : "OnAttackHit_250AP_5Stack_20Dur_120Cd"  );
-  else if ( name == "victors_call"               ) e = ( id == "47725" ? "OnAttackHit_215AP_5Stack_20Dur_120Cd"  : "OnAttackHit_250AP_5Stack_20Dur_120Cd"  );
+  else if ( name == "fetish_of_volatile_power"   ) e = ( heroic ? "OnSpellCast_64Haste_8Stack_20Dur_120Cd" : "OnSpellCast_57Haste_8Stack_20Dur_120Cd" );
+  else if ( name == "talisman_of_volatile_power" ) e = ( heroic ? "OnSpellCast_64Haste_8Stack_20Dur_120Cd" : "OnSpellCast_57Haste_8Stack_20Dur_120Cd" );
+  else if ( name == "vengeance_of_the_forsaken"  ) e = ( heroic ? "OnAttackHit_250AP_5Stack_20Dur_120Cd" : "OnAttackHit_215AP_5Stack_20Dur_120Cd" );
+  else if ( name == "victors_call"               ) e = ( heroic ? "OnAttackHit_250AP_5Stack_20Dur_120Cd" : "OnAttackHit_215AP_5Stack_20Dur_120Cd" );
   else if ( name == "nevermelting_ice_crystal"   ) e = "OnSpellDirectCrit_184Crit_5Stack_20Dur_180Cd_reverse";
 
   // Enchants

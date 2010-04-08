@@ -734,17 +734,6 @@ static void trigger_combustion( spell_t* s )
   }
 }
 
-// trigger_arcane_empowerment ===============================================
-
-static void trigger_arcane_empowerment( spell_t* s )
-{
-  if ( s -> sim -> P333 ) return;
-
-  mage_t* p = s -> player -> cast_mage();
-
-  s -> sim -> auras.arcane_empowerment -> trigger( 1, p -> talents.arcane_empowerment, p -> talents.arcane_empowerment );
-}
-
 // trigger_arcane_concentration =============================================
 
 static void trigger_arcane_concentration( spell_t* s )
@@ -826,6 +815,9 @@ static void trigger_brain_freeze( spell_t* s )
 {
   if ( s -> school != SCHOOL_FROST &&
        s -> school != SCHOOL_FROSTFIRE ) return;
+
+  // Game hotfixed so that Frostfire Bolt cannot proc Brain Freeze.
+  if ( s -> name_str == "frostfire_bolt" ) return;
 
   mage_t* p = s -> player -> cast_mage();
 
@@ -1240,11 +1232,6 @@ struct arcane_barrage_t : public mage_spell_t
     if ( result_is_hit() )
     {
       p -> buffs_missile_barrage -> trigger();
-
-      if ( ( ! sim -> P333 ) && ( result == RESULT_CRIT ) )
-      {
-	trigger_arcane_empowerment( this );
-      }
     }
     p -> buffs_arcane_blast -> expire();
   }
@@ -1322,10 +1309,6 @@ struct arcane_blast_t : public mage_spell_t
     {
       p -> buffs_missile_barrage -> trigger( 1, 1.0, p -> talents.missile_barrage * 0.08 );
       p -> buffs_tier8_2pc -> trigger();
-      if ( ( ! sim -> P333 ) && ( result == RESULT_CRIT ) )
-      {
-	trigger_arcane_empowerment( this );
-      }
     }
     p -> buffs_arcane_blast -> trigger();
   }
@@ -1409,7 +1392,6 @@ struct arcane_missiles_tick_t : public mage_spell_t
     update_stats( DMG_OVER_TIME );
     if ( result == RESULT_CRIT )
     {
-      trigger_arcane_empowerment( this );
       trigger_master_of_elements( this, 0.20 );
     }
   }
@@ -1717,8 +1699,8 @@ struct presence_of_mind_t : public mage_spell_t
 
     if ( options_str.empty() )
     {
-      log_t::output( sim, "simulationcraft: The presence_of_mind action must be coupled with a second action." );
-      exit( 0 );
+      sim -> errorf( "Player %s: The presence_of_mind action must be coupled with a second action.", p -> name() );
+      sim -> cancel();
     }
 
     std::string spell_name    = options_str;
@@ -1819,13 +1801,7 @@ struct fire_ball_t : public mage_spell_t
 
     if ( p -> glyphs.fire_ball )
     {
-      if ( p -> sim -> P333 )
-        base_execute_time -= 0.15;
-      else
-      {
-        base_crit += 0.05;
-        num_ticks = 0;
-      }
+      base_execute_time -= 0.15;
     }
 
     may_torment  = true;
@@ -2069,11 +2045,8 @@ struct pyroblast_t : public mage_spell_t
                                           ( p -> talents.burnout     * 0.10 ) +
                                           ( p -> set_bonus.tier7_4pc_caster() ? 0.05 : 0.00 ) );
 
-    if ( sim -> P333 ) 
-    {
-      direct_power_mod += p -> talents.empowered_fire * 0.05;
-      may_torment = true;
-    }
+    direct_power_mod += p -> talents.empowered_fire * 0.05;
+    may_torment = true;
   }
 
   virtual void execute()
@@ -2212,7 +2185,7 @@ struct combustion_t : public mage_spell_t
   {
     mage_t* p = player -> cast_mage();
     check_talent( p -> talents.combustion );
-    cooldown -> duration = ( sim -> P333 ? 120 : 180 );
+    cooldown -> duration = 120;
 
     id = 11129;
   }
@@ -2264,7 +2237,7 @@ struct frost_bolt_t : public mage_spell_t
 
     base_execute_time = 3.0;
     may_crit          = true;
-    direct_power_mod  = ( base_execute_time / 3.5 ) * ( sim -> P333 ? 1.0 : 0.95 );
+    direct_power_mod  = base_execute_time / 3.5;
     base_cost        *= 1.0 - p -> talents.precision     * 0.01;
     base_cost        *= 1.0 - util_t::talent_rank( p -> talents.frost_channeling, 3, 0.04, 0.07, 0.10 );
     base_execute_time -= p -> talents.improved_frost_bolt * 0.1;
@@ -2561,14 +2534,14 @@ struct frostfire_bolt_t : public mage_spell_t
   virtual double cost() SC_CONST
   {
     mage_t* p = player -> cast_mage();
-    if ( sim -> P333 && p -> buffs_brain_freeze -> check() ) return 0;
+    if ( p -> buffs_brain_freeze -> check() ) return 0;
     return mage_spell_t::cost();
   }
 
   virtual double execute_time() SC_CONST
   {
     mage_t* p = player -> cast_mage();
-    if ( sim -> P333 && p -> buffs_brain_freeze -> up() ) return 0;
+    if ( p -> buffs_brain_freeze -> up() ) return 0;
     return mage_spell_t::execute_time();
   }
 
@@ -2585,8 +2558,7 @@ struct frostfire_bolt_t : public mage_spell_t
       if ( fof_on_cast ) trigger_fingers_of_frost( this );
     }
     trigger_hot_streak( this );
-    if ( p -> sim -> P333 )
-      consume_brain_freeze( this );
+    consume_brain_freeze( this );
   }
 
   virtual void travel( int    travel_result,
@@ -3019,8 +2991,8 @@ struct choose_rotation_t : public action_t
 
     if ( cooldown -> duration < 1.0 )
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: choose_rotation cannot have cooldown -> duration less than 1.0sec\n" );
-      exit( 0 );
+      sim -> errorf( "Player %s: choose_rotation cannot have cooldown -> duration less than 1.0sec", p -> name() );
+      cooldown -> duration = 1.0;
     }
 
     trigger_gcd = 0;
@@ -3222,7 +3194,10 @@ void mage_t::init_glyphs()
     else if ( n == "polymorph"        ) ;
     else if ( n == "slow_fall"        ) ;
     else if ( n == "the_penguin"      ) ;
-    else if ( ! sim -> parent ) util_t::fprintf( sim -> output_file, "simulationcraft: Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    else if ( ! sim -> parent ) 
+    {
+      sim -> errorf( "Player %s has unrecognized glyph %s\n", name(), n.c_str() );
+    }
   }
 }
 
@@ -3290,7 +3265,7 @@ void mage_t::init_buffs()
 
   buffs_arcane_blast         = new buff_t( this, "arcane_blast",         4, 6.0 );
   buffs_arcane_power         = new buff_t( this, "arcane_power",         1, ( glyphs.arcane_power ? 18.0 : 15.0 ) );
-  buffs_brain_freeze         = new buff_t( this, "brain_freeze",         1, 15.0, ( sim -> P333 ? 0.5 : 0.0 ), talents.brain_freeze * 0.05 );
+  buffs_brain_freeze         = new buff_t( this, "brain_freeze",         1, 15.0, 2.0, talents.brain_freeze * 0.05 );
   buffs_clearcasting         = new buff_t( this, "clearcasting",         1, 10.0, 0, talents.arcane_concentration * 0.02 );
   buffs_combustion           = new buff_t( this, "combustion",           3 );
   buffs_fingers_of_frost     = new buff_t( this, "fingers_of_frost",     2,    0, 0, talents.fingers_of_frost * 0.15/2 );
@@ -3443,8 +3418,7 @@ void mage_t::init_actions()
       if ( talents.cold_snap ) action_list_str += "/cold_snap,if=cooldown.deep_freeze.remains>15";
       if ( talents.brain_freeze ) 
       {
-	action_list_str += "/frostfire_bolt,if=buff.brain_freeze.react,P333=1";
-	action_list_str += "/fire_ball,if=buff.brain_freeze.react,P333=0";
+	action_list_str += "/frostfire_bolt,if=buff.brain_freeze.react";
       }
       action_list_str += "/mirror_image";
       action_list_str += "/frost_bolt";
@@ -3523,12 +3497,9 @@ void mage_t::combat_begin()
 {
   player_t::combat_begin();
 
-  if ( sim -> P333 )
+  if ( sim -> auras.arcane_empowerment -> current_value < talents.arcane_empowerment )
   {
-    if ( sim -> auras.arcane_empowerment -> current_value < talents.arcane_empowerment )
-    {
-      sim -> auras.arcane_empowerment -> trigger( 1, talents.arcane_empowerment );
-    }
+    sim -> auras.arcane_empowerment -> trigger( 1, talents.arcane_empowerment );
   }
 
   if ( ! armor_type_str.empty() )
@@ -3545,14 +3516,9 @@ void mage_t::combat_begin()
     }
     else
     {
-      util_t::fprintf( sim -> output_file, "simulationcraft: Unknown armor type '%s' for player %s\n", armor_type_str.c_str(), name() );
-      exit( 0 );
+      sim -> errorf( "Unknown armor type '%s' for player %s\n", armor_type_str.c_str(), name() );
+      armor_type_str.clear();
     }
-  }
-
-  if ( sim -> P333 )
-  {
-    sim -> auras.arcane_empowerment -> trigger( 1, talents.arcane_empowerment, talents.arcane_empowerment > 0 );
   }
 }
 
@@ -3624,10 +3590,6 @@ double mage_t::resource_loss( int       resource,
     {
       rotation.dpm_mana_loss += actual_amount;
     }
-  }
-  else if ( ! sim -> P333 && resource == RESOURCE_HEALTH )
-  {
-    trigger_incanters_absorption( this, amount );
   }
 
   return actual_amount;
@@ -3852,7 +3814,7 @@ player_t* player_t::create_mage( sim_t* sim, const std::string& name, int race_t
 
 void player_t::mage_init( sim_t* sim )
 {
-  sim -> auras.arcane_empowerment = new aura_t( sim, "arcane_empowerment", 1, ( sim -> P333 ? 0.0 : 10.0 ) );
+  sim -> auras.arcane_empowerment = new aura_t( sim, "arcane_empowerment", 1, 0.0 );
 
   for ( player_t* p = sim -> player_list; p; p = p -> next )
   {
