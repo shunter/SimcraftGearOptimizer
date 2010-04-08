@@ -14,11 +14,12 @@ namespace SimcraftCLI {
 	public:
 		String^ GetItem(String^ xml)
 		{  
+			sim_t sim;
 			std::string xmlStr = marshal_as<std::string>(xml);
-			xml_node_t* item_xml = xml_t::create(xmlStr);
+			xml_node_t* item_xml = xml_t::create(&sim, xmlStr);
 
 			item_t item;
-			item.sim = &sim_t();
+			item.sim = &sim;
 
 			armory_t::parse_item_name( item, item_xml );
 			armory_t::parse_item_stats( item, item_xml ) ;
