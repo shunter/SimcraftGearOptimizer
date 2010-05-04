@@ -120,7 +120,7 @@ namespace SimcraftGearOptimizer
                 };
 
             sw.Start();
-            combinations.ForAll(a);
+            combinations.AsParallel().ForAll(a);
 
             Console.WriteLine("max dps: " + maxDps);
             Console.WriteLine(string.Join(Environment.NewLine, highestSet.Select(i => string.Format("{0}={1}", i.Slot, i.Name)).ToArray()));

@@ -4,4 +4,6 @@
 
 #pragma once
 
+#pragma unmanaged
 #include "simulationcraft.h"
+#pragma managed

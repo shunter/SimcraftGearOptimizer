@@ -736,7 +736,9 @@ action_callback_t* unique_gear_t::register_stat_proc( int                type,
 						      bool               reverse,
 						      int                rng_type )
 {
+
   action_callback_t* cb = new stat_proc_callback_t( name, player, stat, max_stacks, amount, proc_chance, duration, cooldown, tick, reverse, rng_type );
+  player->callbacks_to_delete.push_back(cb);
 
   if ( type == PROC_DAMAGE )
   {
@@ -796,7 +798,7 @@ action_callback_t* unique_gear_t::register_discharge_proc( int                ty
     int                rng_type )
 {
   action_callback_t* cb = new discharge_proc_callback_t( name, player, max_stacks, school, min_dmg, max_dmg, proc_chance, cooldown, rng_type );
-
+  player->callbacks_to_delete.push_back(cb);
   if ( type == PROC_DAMAGE )
   {
     player -> register_tick_damage_callback( mask, cb );

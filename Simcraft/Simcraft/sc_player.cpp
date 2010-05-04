@@ -408,9 +408,19 @@ player_t::~player_t()
     rng_list = r -> next;
     delete r;
   }
+  while ( cooldown_t* c = cooldown_list )
+  {
+    cooldown_list  = c -> next;
+    delete c;
+  }
+  while ( dot_t* d = dot_list )
+  {
+    dot_list  = d -> next;
+    delete d;
+  }
 
-      delete buffs.arcane_brilliance;
-    delete buffs.berserking; 
+    delete buffs.arcane_brilliance;
+    delete buffs.berserking;
     delete buffs.blessing_of_kings;
     delete buffs.blessing_of_might;
     delete buffs.blessing_of_wisdom;
@@ -418,10 +428,13 @@ player_t::~player_t()
     delete buffs.blood_fury_sp;
     delete buffs.bloodlust;
     delete buffs.demonic_pact;
+    delete buffs.destruction_potion;
     delete buffs.divine_spirit;
     delete buffs.focus_magic;
     delete buffs.fortitude;
+    delete buffs.hellscreams_warsong;
     delete buffs.heroic_presence;
+    delete buffs.indestructible_potion;
     delete buffs.innervate;
     delete buffs.mark_of_the_wild;
     delete buffs.mongoose_mh;
@@ -430,10 +443,18 @@ player_t::~player_t()
     delete buffs.power_infusion;
     delete buffs.hysteria;
     delete buffs.replenishment;
+    delete buffs.speed_potion;
     delete buffs.stoneform;
+    delete buffs.strength_of_wrynn;
     delete buffs.stunned;
     delete buffs.tricks_of_the_trade;
+    delete buffs.wild_magic_potion_sp;
+    delete buffs.wild_magic_potion_crit;
 
+	std::vector<action_callback_t*>::const_iterator it = callbacks_to_delete.begin();
+	std::vector<action_callback_t*>::const_iterator end = callbacks_to_delete.end();
+	for (; it != end; ++it)
+		delete *it;
 }
 
 // player_t::id ============================================================
@@ -2584,6 +2605,7 @@ void player_t::register_callbacks()
   if ( primary_resource() == RESOURCE_MANA )
   {
     action_callback_t* cb = new judgement_of_wisdom_callback_t( this );
+	callbacks_to_delete.push_back(cb);
 
     register_attack_direct_result_callback( RESULT_HIT_MASK, cb );
     register_spell_direct_result_callback ( RESULT_HIT_MASK, cb );

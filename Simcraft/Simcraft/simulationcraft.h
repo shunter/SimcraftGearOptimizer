@@ -1446,6 +1446,7 @@ struct player_t
   std::vector<action_callback_t*> tick_damage_callbacks         [ SCHOOL_MAX ];
   std::vector<action_callback_t*> direct_damage_callbacks       [ SCHOOL_MAX ];
   std::vector<action_callback_t*> spell_cast_result_callbacks   [ RESULT_MAX ];
+  std::vector<action_callback_t*> callbacks_to_delete;
 
   // Action Priority List
   action_t*   action_list;

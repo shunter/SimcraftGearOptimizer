@@ -458,6 +458,7 @@ sim_t::~sim_t()
   }
 
   if ( rng     ) delete rng;
+  if ( deterministic_rng     ) delete deterministic_rng;
   if ( target  ) delete target;
   if ( scaling ) delete scaling;
   if ( plot    ) delete plot;
@@ -475,7 +476,7 @@ sim_t::~sim_t()
   }
   if ( timing_wheel ) delete[] timing_wheel;
 
-      delete auras.abominations_might;
+    delete auras.abominations_might;
     delete auras.arcane_empowerment;
     delete auras.battle_shout;
     delete auras.celerity;
@@ -1018,7 +1019,7 @@ void sim_t::analyze()
   std::sort( players_by_name.begin(), players_by_name.end(), compare_name() );
 
   raid_dps = total_dmg / total_seconds;
-
+  /*
   chart_t::raid_dps     ( dps_charts,     this );
   chart_t::raid_dpet    ( dpet_charts,    this );
   chart_t::raid_gear    ( gear_charts,    this );
@@ -1036,6 +1037,7 @@ void sim_t::analyze()
     chart_t::timeline_dps     ( p -> timeline_dps_chart,      p );
     chart_t::distribution_dps ( p -> distribution_dps_chart,  p );
   }
+  */
 }
 
 // sim_t::iterate ===========================================================

@@ -80,13 +80,13 @@
     <None Include="Data\default.simc" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Data\items.txt" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\SimcraftCLI\SimcraftCLI.vcxproj">
       <Project>{01AF7A5A-7A2B-40C3-A7DE-B7F809CCEA0C}</Project>
       <Name>SimcraftCLI</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Data\items.txt" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

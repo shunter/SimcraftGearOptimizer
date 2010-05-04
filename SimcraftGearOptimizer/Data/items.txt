@@ -1,49 +1,63 @@
 ﻿50006,Corp'rethar Ceremonial Crown
-47747,Darkbane Pendant
+50005,Amulet of the Silent Eulogy
 50244,Dark Coven Shoulderpads
-46976,Shawl of the Refreshing Winds
-46992,Flowing Vestments of Ascent 
-47663,Felspark Bindings 
+50469,Volde's Cloak of the Night Sky
+50243,Dark Coven Robe
+51007,Ether-Soaked Bracers
 50240,Dark Coven Gloves
 49978,Crushing Coldwraith Belt
-47780,Kel'Thuzad's Leggings of Triumph 
+50242,Dark Coven Leggings
 47092,Boots of the Mourning Widow 
 51557,Runed Signet of the Kirin Tor
-50397,Ashen Band of Unmatched Destruction
+50398,Ashen Band of Endless Destruction
 47182,Reign of the Unliving
 50259,Nevermelting Ice Crystal
-46979,Blade of Tarasque 
-47138,Chalice of Searing Light 
+50805,Mag'hari Chieftain's Staff
+51326,Wand of Ruby Claret
+
+50241,Dark Coven Hood
+51554,Cowl of Malefic Repose
+
+51020,Shoulders of Ruinous Senility
+
+46976,Shawl of the Refreshing Winds
+
+50974,Meteor Chaser's Raiment
+50975,Ermine Coronation Robes
+
+47585,Bejeweled Wizard's Bracers
+
+50782,Sister's Handshrouds
+51005,Gloves of Broken Fingers
+
+47617,Icehowl Cinch
+50996,Belt of Omission
+50997,Circle of Ossus
+
+50990,Kilt of Untreated Wounds
+49891,Leggings of Woven Death
+49892,Lightweave Leggings
+
+50804,Icecrown Spire Sandals
+49893,Sandals of Consecration
+49890,Deathfrost Boots
+
+50966,Abracadaver
+51582,Sister Svalna's Aether Staff
+
+#46979,Blade of Tarasque 
+
+#50781,Scourgelord's Baton
+#47138,Chalice of Searing Light 
+
 47658,Brimstone Igniter
 
-50242,Dark Coven Leggings
+51381,Cerise Coiled Ring
 
-#47778,Kel'Thuzad's Hood of Triumph
-#49484,Nemesis Skullcap
-45822,Evoker's Charm 
-47786,Kel'Thuzad's Robe of Conquest
-47838,Vestments of the Sleepless
-47501,Kurisu's Indecision
-47187,Leggings of the Deepening Void
-50804,Icecrown Spire Sandals
-47617,Icehowl Cinch
-40273,Surplus Limb 
-47787,Kel'Thuzad's Shoulderpads of Conquest 
-47782,Kel'Thuzad's Gloves of Triumph 
+50357,Maghia's Misguided Quill
 
-#49486,Polished Dragonslayer's Signet 
-#47732,Band of the Invoker 
-#39229,Embrace of the Spider 
-#45866,Elemental Focus Stone 
-#49076,Mithril Pocketwatch
-#40682,Sundial of the Exiled
+#45308,Eye of the Broodmother
 #47726,Talisman of Volatile Power
-#47779,Kel'Thuzad's Robe of Triumph
-#50241,Dark Coven Hood
-#50243,Dark Coven Robe
-#51206,Sanctified Dark Coven Robe
-#50353,Dislodged Foreign Object
-#50809,Soulcleave Pendant
+#45866,Elemental Focus Stone 
 
-50805,Mag'hari Chieftain's Staff
-51007,Ether-Soaked Bracers
+#50809,Soulcleave Pendant
